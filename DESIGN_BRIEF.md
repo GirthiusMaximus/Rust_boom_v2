@@ -2,8 +2,8 @@
 
 > **Product:** Theatrical Nuke
 > **Artifact:** Carbon plugin (`.cs`, server-side only)
-> **Status:** **Draft v0.1 — framework stage.** Storyboard is intentionally incomplete past the
-> terminal phase; see §13 for the decisions that must be made before M1.
+> **Status:** **Draft v0.2 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
+> Storyboard is intentionally incomplete past the terminal phase.
 > **Last updated:** 2026-10-17
 >
 > **Read with:** `CARBON_PLUGIN_PLAYBOOK.MD` (process and build order), `CarbonMod.MD` (API surface),
@@ -120,13 +120,13 @@ Times are **after the call** (`t=0`), at `TimeScale = 1.0`. Everything after the
 | 1 | pre | **Acquire** | Finds/earns a Nuclear Football. | Grants the item (loot, admin command or event — §13 Q5). |
 | 2 | − | **Throw** | Throws it like a supply signal. | Validates permission, cooldown, concurrency; refuses early if disallowed (`FR-06`). |
 | 3 | 0 | **Call** | Signal lands, pink/purple smoke column; **all players** get a notification naming the grid. | Records target, computes launch point, starts the strike state machine. Vanilla supply-drop behaviour suppressed (`Q1`). |
-| 4 | 15 s | **Sirens** | Air-raid sirens rise across the map, from several directions. | Plays siren effects at configured anchor points, broadcast to every client (`FR-14`). |
+| 4 | 15 s | **Sirens** | Air-raid sirens rise across the map, from several directions; they swell and fade as you move between anchors. | Starts a pulse loop per anchor, broadcast to every client (`FR-14`/`FR-15`). |
 | 5 | ~30 s | **Breach** | Far out at sea: a plume, then the missile punches through the surface; water-exit effect; motors ignite. | Spawns booster underwater, propels it clear of the water, switches to boost. |
-| 6 | +2 s | **Boost** | Missile climbs, four booster plumes, visible from most of the map. CCTV feed opens showing the engines from the side. | Kinematic climb along the boost arc; camera parented to the booster; per-frame network updates. |
+| 6 | +2 s | **Boost** | Missile climbs, four booster plumes, visible from most of the map; a marker begins to crawl across the map. CCTV feed opens showing the engines from the side. | Kinematic climb along the boost arc; camera parented to the booster; marker parented to the missile; per-frame network updates. |
 | 7 | 80 % apogee | **Booster cutoff** | Plumes stop; the missile keeps coasting. | Stops the four nozzle effects (`FR-22`). |
 | 8 | 95 % apogee | **Bus separation** | A brief flash; the view cuts to a forward-facing camera inside the bus. The booster is gone. | Spawns bus at the tip, re-parents/re-spawns camera, kills the booster, continues on the bus arc. |
 | 9 | apogee | **Midcourse** | A long silent fall; the map turns below. | Bus follows its own arc (102 % apogee, 110 % speed, same impact point). |
-| 10 | post-apogee | **Reentry** | Six tracks appear; the bus releases them within 0.2 s. | Fires 6 `rocket_mlrs` at 0.2 s spread; 5 toward random points within 50 m of target, 1 exact. |
+| 10 | post-apogee | **Reentry** | Six tracks appear on the map and in the sky; the bus releases them within 0.2 s. | Fires 6 `rocket_mlrs` at 0.2 s spread; 5 toward random points within 50 m of target, 1 exact; a marker on each. |
 | 11 | impact | **Detonation** | Flash → fireball → shockwave → mushroom; decoys crack around it. | Applies damage in rings, plays the layered FX, destroys/kills entities in radius over several frames. |
 | 12 | +N s | **Aftermath** | Smoke column persists; scorched ground; chat recap. | Cleanup, statistics, cooldown release, log summary. |
 
@@ -198,9 +198,10 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | FR-11 | M | Vanilla supply-signal behaviour (cargo plane + drop) is suppressed. `Q1` |
 | FR-12 | M | Every connected player receives a notification stating a nuclear strike has been called and the **grid reference** of the target. |
 | FR-13 | M | The notification is delivered through a configurable channel (chat, GUI banner, or both). |
-| FR-14 | M | At `t = 15 s` (configurable), sirens play at **configured world anchors** and are **delivered to every client regardless of distance** (`Effect.server.Run(..., broadcast: true)` — verified, §9.1). |
-| FR-15 | S | Sirens repeat/loop for a configured duration; volume/attenuation is an asset property, not a plugin one (`Q2`). |
+| FR-14 | M | At `t = Sirens.DelaySeconds` (default 15), sirens start at **configured world anchors**. Each anchor **re-emits** the sound on a pulse interval for the whole siren duration, so the sound is spatial (≈1900 m audible range per anchor) and a player who joins or moves into range later hears the next pulse. |
+| FR-15 | M | Anchors are configurable and spaced so their ranges overlap; `PulseIntervalSeconds` is shorter than the sound's length so the siren is continuous. `Q2` |
 | FR-16 | S | A second notification fires at breach and at MIRV release. |
+| FR-17 | M | The caller may **not throw from inside a safe zone**; the target itself may be anywhere, including a safe zone (Q10). |
 
 ### 6.3 Launch
 
@@ -219,6 +220,7 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | FR-26 | M | Four fire/smoke effects are attached at the booster nozzles for the duration of the boost. `Q4` (assets) |
 | FR-27 | M | Apogee is configurable (default `Y = 1000`) and the boost arc targets the call position. |
 | FR-28 | M | The booster is visible and audible to all players (broadcast effects at key beats). |
+| FR-29 | M | A **map marker tracks the missile** through boost, midcourse and reentry, visible to every player (Q6). Implemented with a plugin-spawned `genericradiusmarker` — vanilla MLRS markers are owner-only (§9.1). |
 
 ### 6.5 Midcourse and bus
 
@@ -239,7 +241,7 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | FR-41 | M | Each MIRV uses `assets/content/vehicles/mlrs/rocket_mlrs.prefab` and is aimed at its own point. |
 | FR-42 | M | 5 decoys target uniformly random points within **50 m** of the target; 1 live MIRV targets the exact point. |
 | FR-43 | M | Decoys behave exactly like normal MLRS rockets (impact, explode, damage the ground structures they hit). |
-| FR-44 | S | Vanilla MLRS map markers are configurable (6 markers may spoil the decoy; or may be good theatre). `Q6` |
+| FR-44 | M | Each MIRV carries a plugin-spawned marker so **all six tracks are visible to all players** (Q6 = A). Vanilla `MapMarkerMLRSRocket` cannot do this: it networks only to the rocket's `OwnerID` (§9.1). |
 | FR-45 | S | The live MIRV is visually indistinguishable from the decoys until detonation. |
 
 ### 6.7 Detonation
@@ -261,8 +263,8 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | FR-61 | M | At bus separation the booster camera is destroyed and a new camera is attached **inside the bus**, facing forward, at a configurable local offset/rotation. |
 | FR-62 | M | The swap is seamless: a viewer never sees a black or default feed during the hand-off (`FR-34`). |
 | FR-63 | M | If the camera entity dies or the viewer disconnects, no player is left in a broken UI state. |
-| FR-64 | M | Camera availability is permission-gated (`theatricalnuke.cameras`) and configurable off. |
-| FR-65 | ? | `Q8`: is the view available from **any** computer station, or only a station that travels with the missile? (Brief currently assumes "any station".) |
+| FR-64 | M | No permission gate: **any player can watch** (Q8). The camera is a normal networked entity; a viewer selects it from a computer station (see FR-65). Config can disable the camera system entirely. |
+| FR-65 | M | The view is available from **any** computer station, not only one on the missile (Q8, Q14). |
 
 ### 6.9 Admin and debug
 
@@ -290,7 +292,8 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 
 ### 7.1 Config sketch
 
-Starting values only — tune on the live server.
+Starting values only — tune on the live server. Asset paths supplied by the operator on 2026-10-17 are
+filled in; the rest are marked `ASSET-TBD`.
 
 ```json
 {
@@ -309,16 +312,20 @@ Starting values only — tune on the live server.
     "Permission": "theatricalnuke.call",
     "GlobalCooldownSeconds": 3600,
     "PerPlayerCooldownSeconds": 86400,
-    "AirdropChance": 0.0
+    "AirdropChance": 0.0,
+    "RequireOutsideSafeZoneToThrow": true,
+    "AllowTargetInsideSafeZone": true
   },
-  "Warning": {
-    "NotifyAllOnCall": true,
-    "SirensDelaySeconds": 15,
-    "SirenDurationSeconds": 25,
-    "SirenAnchors": [
+  "Sirens": {
+    "Enabled": true,
+    "DelaySeconds": 15,
+    "DurationSeconds": 45,
+    "PulseIntervalSeconds": 8,
+    "AudibleRangeMeters": 1900,
+    "Effect": "assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab",
+    "Anchors": [
       { "x": 0.0, "y": 0.0, "z": 0.0 }
-    ],
-    "SirenEffect": "ASSET-TBD"
+    ]
   },
   "Launch": {
     "OppositeSideFraction": 0.85,
@@ -337,14 +344,23 @@ Starting values only — tune on the live server.
   },
   "Visuals": {
     "MissilePrefab": "assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab",
-    "BusPrefab": "ASSET-TBD",
-    "BoosterNozzleEffects": ["ASSET-TBD", "ASSET-TBD", "ASSET-TBD", "ASSET-TBD"],
-    "WaterExitEffect": "ASSET-TBD",
-    "SeparationEffect": "ASSET-TBD"
+    "BusPrefab": "assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab",
+    "BoosterNozzleEffect": "assets/prefabs/npc/m2bradley/oilfireball2.prefab",
+    "BoosterNozzleCount": 4,
+    "WaterExitEffect": "assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab",
+    "SeparationEffect": "ASSET-TBD",
+    "TargetSmokeEffect": "ASSET-TBD"
+  },
+  "Marker": {
+    "Enabled": true,
+    "Prefab": "assets/prefabs/tools/map/genericradiusmarker.prefab",
+    "MissileRadiusMeters": 25.0,
+    "MirvRadiusMeters": 8.0,
+    "Color": "#FF33D9",
+    "Alpha": 0.55
   },
   "Camera": {
     "Enabled": true,
-    "Permission": "theatricalnuke.cameras",
     "BoosterOffset": { "x": 2.0, "y": 0.0, "z": 0.0 },
     "BoosterPitch": 60.0,
     "BusOffset": { "x": 0.0, "y": 0.0, "z": 0.5 },
@@ -356,7 +372,6 @@ Starting values only — tune on the live server.
     "LaunchSpreadSeconds": 0.2,
     "DecoyRadiusMeters": 50.0,
     "RocketPrefab": "assets/content/vehicles/mlrs/rocket_mlrs.prefab",
-    "ShowMapMarkers": true,
     "SpeedMetersPerSecond": 90.0
   },
   "Blast": {
@@ -370,6 +385,10 @@ Starting values only — tune on the live server.
   }
 }
 ```
+
+`Sirens.AudibleRangeMeters` is documentation and anchor-spacing guidance, not a plugin parameter —
+falloff belongs to the sound asset. `PulseIntervalSeconds` must be ≤ the sound's own length (probe R6
+measures it).
 
 ### 7.2 Config UI
 
@@ -443,7 +462,12 @@ compiled).
 | Football item | `grenade.supplysignal.deployed.prefab` = `SupplySignal : TimedExplosive`. | ✅ verified |
 | Missile prefab exists | `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab` is present in the client asset tree. | ✅ file exists |
 | Missile prefab is spawnable | Its entity component is **unknown** — a decorative prefab may have no `BaseEntity`. | ⚠️ probe R1 |
+| Bus prefab spawnable | `nuclear_warhead.prefab` is not in the entity index, so it may be an FX prefab rather than an entity. | ⚠️ probe R8 |
 | CCTV on a moving parent | `CCTV_RC` exists (`cctv.static`, `cctv_deployed`); parenting to a moving entity and keeping the feed alive is **unverified**. | ⚠️ probe R2 |
+| CCTV discovery | A station only auto-gathers **static** cameras within `autoGatherRadius`; anything else must be added by identifier (`ForceAddBookmark`). Confirmed in `ComputerStation.GatherStaticCameras`. | ✅ verified |
+| Vanilla MLRS map marker is private | `MapMarkerMLRSRocket.ShouldNetworkTo` returns `player.userID == OwnerID` and `limitNetworking = true`: the marker is visible **only to the rocket's owner**, never to the server. Six vanilla markers cannot be shown to everyone. | ✅ verified — changes FR-29/FR-44 |
+| Generic map marker | `genericradiusmarker.prefab` = `MapMarkerGenericRadius` with public `radius`, `color1`, `color2`, `alpha` and `SendUpdate()`; no `ShouldNetworkTo` override, so it is not owner-limited. | ✅ verified (visibility still needs R7) |
+| `oilfireball2` is an entity | `oilfireball2.prefab` = `FireBall : BaseEntity` — `damagePerSecond = 2`, `radius = 0.5`, life 20–40 s, spreads fire. Usable as a plume only after neutering (damage 0, spread off), and it self-extinguishes. | ⚠️ probe R9 |
 | Debug drawing | `ddraw.line/arrow/sphere/text/box` via `SendConsoleCommand` (duration + colour). | ✅ verified pattern |
 | Clearing debug drawing | `ddraw.clear` — **not verified**. | ⚠️ probe R3 |
 
@@ -475,30 +499,50 @@ Rules:
 
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| R1 | Missile prefab has no entity component and cannot be spawned normally. | Blocks the whole visual. | Probe first (spawn, log type, `Spawn()` result). Fallback: wrap the prefab in a scene object parented to an invisible `BaseEntity` — verify on server. |
+| R1 | Missile prefab has no entity component and cannot be spawned normally. | Blocks the whole visual. | Probe first. Fallback: wrap the prefab in a scene object parented to an invisible `BaseEntity` — verify on server. |
 | R2 | CCTV cannot follow a fast-moving parent smoothly, or requires power/IO. | Camera requirement fails. | Probe with a spawned `cctv.static` parented to a moving dummy; measure. Fallback: drive the camera as a separate entity following the rig. |
 | R3 | `ddraw.clear` does not exist. | Debug lines linger. | Accept expiry-based clear (§8.3). |
-| R4 | Client culls/attenuates broadcast audio by distance. | "Audible everywhere" fails. | Multiple anchors + asset choice with high max distance; test at map extremes. |
+| R4 | Client culls/attenuates broadcast audio by distance. | Sirens inaudible at map edges. | Anchors in overlapping rings; verify reach per anchor (R6); add a per-player audio layer only if needed. |
 | R5 | Large blast = thousands of entity kills in one tick. | Lag spike / disconnect. | Time-sliced kill budget (`Blast.EntitiesPerFrameBudget`). |
-| R6 | Six `MLRSRocket`s each create map markers. | Decoys revealed on map. | Config toggle; suppress markers if needed. |
+| R6 | `FireBall` plumes damage, spread fire, or detach from a moving parent. | Damage where none should be; plumes left behind. | Neuter each ball (damage 0, radius 0, no spread) and parent it; verify with R9. Fallback: pure FX prefab attached via `Effect.server.Run`. |
 | R7 | Reload mid-flight. | Orphans, stuck cameras. | Recovery scan on load; `Cleanup` on unload; abort command. |
 | R8 | Prefab path changes after a Rust update. | Silent no-show. | Validate all prefabs at load; refuse to arm and log loudly. |
+| R9 | `nuclear_warhead.prefab` is an FX-only prefab with no entity. | The bus cannot be a spawnable body. | R8 spawn probe decides; fallback is an invisible carrier entity with the warhead effect attached. |
+| R10 | Safe zones nullify the strike (vanilla rockets self-destruct on `TriggerSafeZone`, damage is blocked). | Q10's "real consequences" may not happen. | Verify in R10; decide between fizzle / deflection / bespoke handling (Q17). |
+
+### 9.4 FX research pass (required before M5)
+
+Q7 = C: the nuclear detonation will not be assembled from guesswork. The pass will:
+
+1. Enumerate candidate vanilla prefabs by effect family — flash, fireball, shockwave, smoke column,
+   mushroom canopy, dust ring, crater decal, low-frequency boom.
+2. Audition each with `/probe fx <prefab>` on the target server at night and at day, from 100 m,
+   600 m and 2 km.
+3. Propose a layered composition with per-layer scale, delay and lifetime, plus a fallback if a layer
+   fails to load.
+4. Record the final set in §7.1 `Blast.EffectPrefabs` and §10.
+
+No blast tuning happens before this pass; the config keeps `ASSET-TBD` until then.
 
 ---
 
 ## 10. Asset and effect register
 
-The operator can specify exact prefabs (`Q3`, `Q4`, `Q7`). Nothing is assumed.
+Paths supplied by the operator on 2026-10-17 are marked ✅. Anything still `ASSET-TBD` is a
+placeholder that must be replaced before release; the load-time validator refuses to arm the strike
+if a required prefab is missing.
 
 | Slot | Config key | Status | Notes |
 |---|---|---|---|
 | Missile body | `Visuals.MissilePrefab` | ✅ given | `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab` |
-| Bus | `Visuals.BusPrefab` | ❌ TBD | Must read as "the tip of the missile". |
-| 4 × booster plumes | `Visuals.BoosterNozzleEffects` | ❌ TBD | Fire/smoke; need attachment points on the model. |
-| Water-exit cue | `Visuals.WaterExitEffect` | ❌ TBD | Audio cue for clearing the surface. |
-| Separation flash | `Visuals.SeparationEffect` | ❌ TBD | Masks the bus swap. |
-| Air-raid siren | `Warning.SirenEffect` | ❌ TBD | Must carry over distance; pick by max audible range. |
-| Nuke FX layers | `Blast.EffectPrefabs` | ❌ TBD | Flash/fireball/shockwave/stem/canopy/dust. |
+| Bus | `Visuals.BusPrefab` | ✅ given | `assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab` — spawnability unconfirmed (R8) |
+| Booster plumes ×4 | `Visuals.BoosterNozzleEffect` | ✅ given | `assets/prefabs/npc/m2bradley/oilfireball2.prefab` — a `FireBall` entity, needs neutering (R9) |
+| Water-exit cue | `Visuals.WaterExitEffect` | ✅ given | `assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab` |
+| Separation flash | `Visuals.SeparationEffect` | ❌ TBD | Operator left this to us: pick during the FX pass (§9.4). |
+| Air-raid siren | `Sirens.Effect` | ✅ given | `assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab` |
+| Target smoke | `Visuals.TargetSmokeEffect` | ❌ TBD | Pink/purple smoke (Q13). |
+| Map marker | `Marker.Prefab` | ✅ chosen | `assets/prefabs/tools/map/genericradiusmarker.prefab` |
+| Nuke FX layers | `Blast.EffectPrefabs` | ⏳ FX pass | Q7 = C: research pass before choosing. |
 | MIRV rocket | `Mirv.RocketPrefab` | ✅ given | `assets/content/vehicles/mlrs/rocket_mlrs.prefab` |
 
 **Rule:** every prefab is validated at load (exists, loads, type is what we expect). A missing asset
@@ -545,32 +589,48 @@ Rust plugin can have. It follows `Exceptions.md` without exception:
 
 ---
 
-## 13. Open questions and decision gates
+## 13. Decision register
 
-These block or shape M1. Each has a recommendation; the default is what will be built if the answer
-is "you decide".
+Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_PROBES.md` Part A.
 
-**Answer one at a time in `M0_PROBES.md` Part A** — it restates each question self-contained, with
-options and an answer line. Probe instructions and the report template are in Part C/D of the same
-file.
+### 13.1 Resolved
 
-| # | Question | Recommendation (default) |
+| # | Decision | Answer | Consequence |
+|---|---|---|---|
+| Q1 | Vanilla supply drop on throw | **Suppress** (A) | Harmony prefix on `SupplySignal.Explode`, verified by R5. |
+| Q2 | Siren model | **Spatial anchors with overlap**, sound usable ≈1900 m from spawn | Anchors re-emit on a pulse interval so late joiners and players moving into range hear the next pulse (FR-14/15). |
+| Q3 | Water-exit cue | `explosion_underwater_surface_large.prefab` | Fires at breach. |
+| Q4 | Bus / plumes / separation | Bus `nuclear_warhead.prefab`; plumes `oilfireball2.prefab` ×4; separation **our choice** | Separation flash selected in the FX pass; `FireBall` needs neutering (R9). |
+| Q5 | Acquisition | **Admin grant only for v1** (A) | Loot/airdrop deferred. |
+| Q6 | Map presence | **All six MIRVs visible** (A) + a marker tracking the missile | Vanilla MLRS markers are owner-only, so markers are plugin-spawned `genericradiusmarker` instances (FR-29/44). |
+| Q7 | Blast composition | **Research pass first** (C) | §9.4 gates M5. |
+| Q8 | Who can watch | **Anybody** (B) | No camera permission; FR-64 changed. |
+| Q10 | Target rules | **Anywhere is targetable; cannot throw from inside a safe zone** (A/D hybrid) | FR-17 added; safe-zone behaviour still needs R10/Q17. |
+| Q11 | 80 %/95 % | **Altitude fraction** (A) | Trajectory triggers by Y. |
+| Q12 | Booster at hand-off | **Killed instantly** (A) | Separation flash masks it. |
+
+### 13.2 Remaining
+
+| # | Question | Why it matters | Default if unanswered |
+|---|---|---|---|
+| Q13 | Pink/purple smoke: is there a coloured-smoke prefab? | FR-10's target marker is currently vanilla smoke colour. | Use the vanilla supply-signal smoke for v1. |
+| Q14 | How does a player pick a camera that is nowhere near a station? | Stations only list static cameras nearby; a missile camera must be bookmarked by ID. | Plugin force-adds the bookmark and prints the ID in chat. |
+| Q15 | Confirm "FP" = first-person debug overlay in the caller's view? | Cosmetic naming only. | Assume first-person. |
+| Q16 | Confirm the marker approach: purple `genericradiusmarker` instead of a tiny MLRS rocket? | The rocket-marker idea cannot work server-wide (owner-only networking). | Purple radius marker on the missile and on each MIRV. |
+| Q17 | What does "real consequences" mean for a safe zone hit? Vanilla rockets self-destruct on safe-zone triggers and damage is blocked. | Decides whether a strike on Outpost/Bandit actually does anything. | Strike fizzles inside the safe-zone volume; log it and warn the caller. |
+| Q18 | Are the six MIRV markers allowed to be *ship-sized* circles, or should they read as small dots? | Visual taste. | Small (8 m) dots. |
+
+### 13.3 Work items created by the answers
+
+| # | Item | Gate |
 |---|---|---|
-| Q1 | Does throwing the football still trigger the vanilla supply drop? | **Suppress it.** The football is a dedicated item; a cargo plane would confuse the beat sheet. |
-| Q2 | Which prefab is the air-raid siren, and does it carry across the map? | Operator supplies the prefab; we place N anchors and verify attenuation at the map corners. |
-| Q3 | Which water-exit effect/audio cue? | Operator supplies the path. |
-| Q4 | Bus prefab, 4 nozzle effects, separation flash? | Operator supplies; otherwise we use the closest vanilla FX and mark them placeholder. |
-| Q5 | How is the football obtained? | Admin grant command in v1 + configurable airdrop chance; loot-table integration later. |
-| Q6 | Should the 6 MIRVs show map markers? | **On** by default — six tracks are good theatre; toggle for servers that prefer the decoy. |
-| Q7 | Nuclear FX composition — which prefabs, and how big is "big"? | Start with a layered vanilla composition at ~160 m light radius; tune visually. |
-| Q8 | Is the CCTV viewable from **any** computer station, or only a station on the missile? | **Any station**, permission-gated. A station on the missile makes no sense for players who cannot stand on it. |
-| Q9 | Does the client support `ddraw.clear`? | Probe on the live server; fallback is expiry-based clear (§8.3). |
-| Q10 | Target validation: safe zones, monuments, water, out-of-bounds? | Refuse safe zones; allow everywhere else in-bounds with a warning; water → no strike (nothing to hit). |
-| Q11 | Is "80 % / 95 % of apogee" an altitude fraction or a path fraction? | **Altitude fraction** (simplest, matches "Y level 1000"). |
-| Q12 | What happens to the booster at hand-off — killed instantly? | Killed in the same tick the bus spawns and the camera moves; a separation flash covers it. |
-| Q13 | Pink/purple smoke: is there a coloured-smoke prefab? | Operator supplies it; otherwise accept the vanilla smoke colour for v1. |
-| Q14 | How does a player select a camera that is nowhere near a station? | Plugin force-adds the bookmark and prints the camera ID in chat. |
-| Q15 | "FP" = first-person debug overlay? | Yes — `ddraw` primitives drawn in the triggering admin's own view. |
+| FX-1 | Nuclear FX research pass (§9.4) | Before M5 |
+| FX-2 | Separation flash selection | During FX-1 |
+| P-1 | Probe the bus prefab's spawnability (R8) | M0 |
+| P-2 | Probe `FireBall` as a plume (R9) | M0 |
+| P-3 | Probe marker visibility to a second player (R7) | M0 |
+| P-4 | Probe siren reach and late-join behaviour (R6) | M0 |
+| P-5 | Probe safe-zone behaviour of an MLRS rocket (R10) | M0 |
 
 ---
 
@@ -578,7 +638,7 @@ file.
 
 | Milestone | Deliverable | Gate |
 |---|---|---|
-| **M0 — Probes** | R1 missile spawn, R2 CCTV-on-moving-parent, R3 `ddraw.clear`, R4 siren reach, Q1 supply-drop suppression. | All five answered on the live server; findings recorded in §9.1 and §13. |
+| **M0 — Probes** | R1 missile spawn, R2 CCTV on a moving parent, R3 `ddraw.clear`, R4 broadcast sound reach, R5 supply-drop suppression, R6 siren reach/late-join, R7 marker visibility, R8 bus prefab, R9 `FireBall` plumes, R10 safe-zone behaviour. | All ten answered on the live server; findings recorded in §9.1 and §13. |
 | **M1 — Skeleton** | Plugin loads, config UI, football item + permission + cooldown, call validation, exception log + guard wired. | Success criteria 1 and 7. |
 | **M2 — Warning** | Smoke detection, grid notification, sirens, abort. | Criteria 3. |
 | **M3 — Launch & boost** | Water spawn, breach, boost arc, four plumes, camera A. | Visual check at 600 m. |
@@ -609,6 +669,7 @@ amended if reality disagreed.
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 2026-10-17 | Initial framework: storyboard, FRs, config sketch, feasibility probes, open questions. | Build agent |
+| 0.2 | 2026-10-17 | Operator answers recorded (Q1–Q12). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
 
 ---
 

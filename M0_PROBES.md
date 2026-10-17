@@ -1,463 +1,300 @@
-# M0 — Questions and Probe Kit
+# M0 — Decisions and Probe Kit
 
-> **Purpose.** Everything needed to (a) answer the open design questions one at a time and (b) run the
-> five M0 probes on the live server.
+> **Status:** decisions Q1–Q12 recorded 2026-10-17. **Remaining: Q13–Q18 and probes R1–R10.**
+> Nothing in M1 is blocked by the remaining questions; M3/M4 are blocked by R1, R2, R8 and R9.
 >
-> **Companion:** `DESIGN_BRIEF.md` §13 holds the same questions in short form. This file is the
-> working copy: answer here, then the brief gets updated and the question is closed.
->
-> **Status:** awaiting operator input. Nothing in M1 is blocked except by Part A.
-
-**Contents**
-
-- [Part A — Decisions (answer each one)](#part-a--decisions)
-- [Part B — Assets I need from you](#part-b--assets)
-- [Part C — Probes: what they are and how to run them](#part-c--probes)
-- [Part D — Report template](#part-d--report-template)
+> **Companion:** `DESIGN_BRIEF.md` §13 is the authoritative decision register. This file is the
+> working kit: what is decided, what is still open, and how to test the ten things the code will
+> depend on.
 
 ---
 
 ## Part A — Decisions
 
-Answer in any order; "you decide" is a valid answer and the default is used. Each question is
-self-contained — you do not need to re-read the brief.
+### A.1 Recorded
 
----
-
-### Q1 — Should the vanilla supply drop still happen?
-
-**Question.** When a player throws the Nuclear Football, should Rust's normal supply-signal behaviour
-still run (cargo plane flies in, drops a supply crate)?
-
-**Why it matters.** A cargo plane crossing the sky at the same moment as the nuke steals the
-attention and adds a second, unrelated objective. It also gives players a reason to run *toward* the
-target instead of away.
-
-**Options.**
-
-- **A. Suppress it.** The football only calls the strike. *(recommended)*
-- **B. Let both happen.** Free loot at a nuclear strike; chaotic but thematic.
-- **C. Suppress only for non-admins.**
-
-**Answer:** ______________________________________________________________________
-
----
-
-### Q2 — Which prefab is the air-raid siren?
-
-**Question.** There is no confirmed vanilla "air raid siren" prefab. What should play, and where
-should it play from?
-
-**Why it matters.** `Effect.server.Run(..., broadcast: true)` delivers the effect to **every**
-connected client (verified), but the client still plays it *at a world position* with normal 3D
-falloff. Networked everywhere ≠ audible everywhere. How we place it decides whether the requirement
-"audible to all players" is actually met.
-
-**Options.**
-
-- **A. You supply a siren prefab path**, and we place several anchors around the map. *(recommended)*
-- **B. One anchor at map centre.** Simplest; likely inaudible at the edges.
-- **C. Per-player local playback.** Play the sound at each player's own position, sent only to them
-  (`sourceConnection`), so distance falloff cannot apply. Guarantees audibility; sounds "inside your
-  head" rather than spatial.
-- **D. A + C combined.** World anchors for atmosphere, plus a quiet per-player layer so nobody misses
-  it. *(strong alternative)*
-
-**Answer:** ______________________________________________________________________
-
-**If A or D: paste the prefab path(s) here:** ______________________________________
-
----
-
-### Q3 — Which effect is the water-exit cue?
-
-**Question.** You mentioned a specific Rust effect that gives the audio cue of the missile clearing
-the water. What is its prefab path?
-
-**Why it matters.** It is the transition from "something is happening out at sea" to "the missile is
-airborne", and it is the first moment players know where to look.
-
-**Answer (prefab path):** ________________________________________________________
-
----
-
-### Q4 — Bus, plumes and separation
-
-**Question.** Four assets are needed for the missile body phases. Do you have specific prefabs, or
-should I pick vanilla approximations and flag them as placeholders?
-
-| Slot | What it must look like | Your prefab path |
+| # | Question | Answer |
 |---|---|---|
-| Bus | The post-boost vehicle, reads as "the tip of the missile" | |
-| Booster plume ×4 | Fire/smoke at the four nozzles | |
-| Separation flash | Covers the booster → bus swap | |
-| Pink/purple smoke | The target marker column (see Q13) | |
+| Q1 | Vanilla supply drop on throw? | **Suppress it.** The football only calls the strike. |
+| Q2 | Siren model | **Spatial, anchor-based**, ~1900 m audible range, overlapping anchors. Latecomers hear it. |
+| Q3 | Water-exit cue | `assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab` |
+| Q4 | Bus / plumes / separation | Bus `nuclear_warhead.prefab`; plumes `oilfireball2.prefab` ×4; separation flash — our choice |
+| Q5 | Acquisition | **Admin grant only** for v1 |
+| Q6 | Map presence | **All six MIRVs visible** + a marker on the missile itself |
+| Q7 | Blast composition | **Research pass first** — scheduled as §9.4, gates M5 |
+| Q8 | Who watches the camera | **Anybody** — no permission gate |
+| Q10 | Target rules | **Target anywhere; cannot throw from inside a safe zone** |
+| Q11 | 80 %/95 % | **Altitude (Y) fraction** |
+| Q12 | Booster at hand-off | **Killed instantly**, masked by the separation flash |
 
-**Why it matters.** These are the difference between "a prefab moving" and "a missile launch". I will
-not invent paths — a wrong path fails silently at 60 seconds into the sequence.
+**Q2 mechanics — what "spatial" means in Rust.** `Effect.server.Run(..., broadcast: true)` is
+delivered to *every* connected client. The spatial part is client-side audio attenuation, not network
+range: an effect at an anchor is loud near it and silent far away. To satisfy "a player who arrives
+later still hears it", each anchor **re-emits** the sound on a pulse interval for the siren's
+duration, so a late joiner hears the next pulse within `PulseIntervalSeconds`. Anchors should be
+spaced at roughly `AudibleRange × 1.0` so their coverage overlaps. R6 measures the real range and the
+sound's length.
 
-**Answer:** fill the table, or "use placeholders" → ______________________________
+**Q6 mechanics — a correction from the source.** You asked for a tiny MLRS rocket to get a marker on
+the map. Verified in `MapMarkerMLRSRocket`:
 
----
+```csharp
+public override bool ShouldNetworkTo(BasePlayer player) => player.userID == base.OwnerID;
+```
 
-### Q5 — How does a player obtain the football?
+The marker is networked **only to the rocket's owner** (`limitNetworking = true`). Spawned by the
+plugin, it would be visible to nobody; spawned for the caller, only to the caller. Six vanilla
+markers therefore cannot be shown to the whole server.
 
-**Question.** "Rare to obtain" — by what mechanism?
+Instead we spawn `assets/prefabs/tools/map/genericradiusmarker.prefab` (`MapMarkerGenericRadius`,
+public `radius`/`color1`/`color2`/`alpha`, `SendUpdate()`, no owner restriction) and parent it to the
+missile and to each MIRV. That gives everyone a moving purple mark, configurable size and colour, with
+no rocket entity involved. **Q16 asks you to confirm this substitution.**
 
-**Options.**
-
-- **A. Admin grant command only** (`/nuke give <player>`). *(recommended for v1)*
-- **B. Airdrop chance** — configurable % chance for an airdrop to contain one.
-- **C. Loot table** — added to elite crates / locked crates at a configurable weight.
-- **D. Craft** — expensive recipe.
-
-**Why it matters.** It decides whether the feature is an admin event tool or a player-driven economy
-item. It also decides what has to be tested before release.
-
-**Answer:** ______________________________________________________________________
-
----
-
-### Q6 — Should the six MIRVs show on the map?
-
-**Question.** Vanilla `MLRSRocket` creates a map marker in `ServerInit` — every rocket, automatically.
-Six MIRVs means six incoming markers unless we suppress some.
-
-**Why it matters.** Six tracks is great theatre and tells players "this is the end". It also reveals
-that five of them are decoys, which is either the joke or the spoiler, depending on your taste.
-
-**Options.**
-
-- **A. All six visible.** *(recommended)*
-- **B. Only the live one visible.**
-- **C. None visible** — the whole thing arrives unannounced except for the sirens.
-
-**Answer:** ______________________________________________________________________
+**Q7 status.** Recorded as "wait for an FX research pass". That pass is §9.4 of the brief: enumerate
+candidate prefabs, audition them with `/probe fx` from 100 m / 600 m / 2 km, then fix the layer list
+before any blast tuning. No action needed from you beyond being present for the audition.
 
 ---
 
-### Q7 — How big is the nuclear explosion, and how is it built?
+### A.2 Remaining — answer these
 
-**Question.** A single `TimedExplosive.Explode()` is one prefab effect with one radius. A credible
-nuclear detonation needs layers: flash → fireball → shockwave ring → stem → mushroom canopy → dust
-ring, plus several damage rings.
+#### Q13 — Pink/purple smoke
 
-**Options.**
+The vanilla supply-signal smoke is not pink. Do you have a coloured-smoke effect prefab?
 
-- **A. Layered vanilla composition**, tuned visually, ~160 m light radius. *(recommended)*
-- **B. One big vanilla explosion**, cheap and ugly.
-- **C. Wait for an FX research pass** before deciding.
+- **A.** You supply the path → `________________________________`
+- **B.** I find the closest vanilla coloured smoke and flag it as a placeholder. *(recommended)*
+- **C.** Accept the vanilla smoke colour for v1.
 
-**Also tell me:** the lethal radius you want (kills players outright), and whether structures should
-be destroyed or only damaged.
+**Answer:** ______
 
-**Answer:** ______________________________________________________________________
+#### Q14 — Camera selection
 
----
+A computer station only lists **static** cameras within a small radius; any other camera has to be
+added as a bookmark by identifier. A camera on a missile is not near any station.
 
-### Q8 — Who can watch the missile camera?
+- **A.** Plugin force-adds the bookmark to stations and prints the camera ID in chat. *(recommended)*
+- **B.** Print the ID and let players add it manually.
+- **C.** Skip stations and open the feed as a UI overlay.
 
-**Question.** The CCTV feed — who is allowed to view it?
+**Answer:** ______
 
-**Options.**
+#### Q15 — "FP" meaning
 
-- **A. Anyone with a permission**, from any computer station on the map. *(recommended)*
-- **B. Anyone, no permission** — maximum spectacle.
-- **C. Only the player who called the strike.**
-- **D. Only admins.**
+Is "FP Debug mode" first-person debug — the overlay drawn in the triggering admin's own view using
+`ddraw`?
 
-**Why it matters.** It determines whether we need to auto-add camera bookmarks to stations, and
-whether the camera entity must be discoverable by the station UI at all.
+- **A.** Yes, first-person. *(assumed)*
+- **B.** Something else → `________________________________`
 
-**Answer:** ______________________________________________________________________
+**Answer:** ______
 
----
+#### Q16 — Marker substitution
 
-### Q10 — Where is a strike *not* allowed?
+Confirm replacing the "tiny MLRS rocket" idea with a `genericradiusmarker` parented to the missile
+and to each MIRV (the vanilla marker is owner-only — see A.1).
 
-**Question.** What happens if the smoke lands somewhere the nuke should not go?
+- **A.** Yes, purple radius markers. *(recommended)*
+- **B.** Keep trying to use an MLRS rocket — accept that only one player can see its marker.
 
-**Options.**
+**Answer:** ______
 
-- **A. Refuse safe zones and water; allow everywhere else in-bounds.** *(recommended)*
-- **B. Also refuse monuments** (a list in config).
-- **C. Allow anywhere** — the player's problem.
-- **D. Always allow, but deflect the target to the nearest valid point.**
+#### Q17 — Safe-zone consequences
 
-**Why it matters.** A nuke inside a safe zone or under the map is a support ticket, a wipe-day
-argument, or both. This is also where "what if it lands in deep water" gets decided.
+**Finding:** a vanilla `MLRSRocket` that touches a `TriggerSafeZone` calls `Kill()` without exploding,
+and safe zones block explosion damage. So a strike aimed inside a safe zone currently does **nothing**
+— it will not "render the safezone uninhabitable" without extra work.
 
-**Answer:** ______________________________________________________________________
+What should happen?
 
----
+- **A.** Accept the fizzle: the rocket dies, the zone survives, the caller is told. *(simplest, honest)*
+- **B.** Deflect the target to the nearest point outside the safe zone, and tell the caller.
+- **C.** Bespoke bypass: detonate manually at the target and apply damage that ignores safe-zone
+  protection (needs research + a test; may still be blocked by `InSafeZone` checks).
+- **D.** Something else → `________________________________`
 
-### Q11 — "80 % / 95 % of apogee" — altitude or path?
+**Answer:** ______
 
-**Question.** When the brief says the plumes stop at 80 % of apogee and the bus spawns at 95 %, is
-that 80 % of the **height** (Y), or 80 % of the **distance travelled along the arc**?
+#### Q18 — MIRV marker size
 
-**Options.**
+Six markers appear in the last seconds. Should they read as small dots or as visible circles?
 
-- **A. Height.** `y ≥ apogee × 0.80`. *(recommended — matches "Y level 1000")*
-- **B. Path distance.**
+- **A.** 8 m dots. *(recommended)*
+- **B.** Larger circles (25 m+) — easier to see, more cluttered.
+- **C.** No MIRV markers; keep only the missile marker.
 
-**Why it matters.** Path-based fractions fire much later on a shallow arc and change the whole
-timeline. Altitude is also what a player can see.
-
-**Answer:** ______________________________________________________________________
-
----
-
-### Q12 — What happens to the booster at hand-off?
-
-**Question.** When the bus spawns inside the tip, what happens to the original missile body?
-
-**Options.**
-
-- **A. Killed instantly in the same tick**, masked by the separation flash. *(recommended)*
-- **B. Cut loose and fall**, so players see it tumble away.
-- **C. Kept as a non-networked prop** until cleanup.
-
-**Why it matters.** A visible falling booster is a nice detail but it is another entity to network,
-kill and account for — and it doubles the chance of leaving an orphan on reload.
-
-**Answer:** ______________________________________________________________________
-
----
-
-### Q13 — Pink/purple smoke: which asset? *(new — found during research)*
-
-**Question.** The vanilla supply signal produces its own smoke colour, which is not pink/purple.
-Do you have a coloured-smoke effect prefab, or should I find one?
-
-**Options.**
-
-- **A. You supply the prefab path.** *(recommended)*
-- **B. I find the closest vanilla coloured smoke** and flag it as a placeholder.
-- **C. Accept the vanilla supply-signal smoke colour** for v1.
-
-**Answer (prefab path):** ________________________________________________________
-
----
-
-### Q14 — How does a player find the camera feed? *(new — found during research)*
-
-**Question.** A computer station only auto-lists **static** cameras within a small radius
-(`GatherStaticCameras`); any other camera must be added as a bookmark by identifier. A camera
-attached to a missile is nowhere near a station, so how should players get the feed?
-
-**Options.**
-
-- **A. Plugin adds the bookmark automatically** to stations near the player/caller, and prints the
-  camera ID in chat. *(recommended)*
-- **B. Print the camera ID in chat** and let players add it manually.
-- **C. Skip stations**: open the feed directly as a UI overlay.
-
-**Why it matters.** If this is wrong, the camera exists and nobody can watch it — the single most
-expensive kind of "working" feature.
-
-**Answer:** ______________________________________________________________________
-
----
-
-### Q15 — Confirm "FP" *(minor)*
-
-**Question.** Is "FP Debug mode" first-person debug — i.e. the lines are drawn in the triggering
-admin's own view, using the client's `ddraw` commands?
-
-**Options.** **A. Yes, first-person.** *(assumed)* — **B. Something else** (describe).
-
-**Answer:** ______________________________________________________________________
+**Answer:** ______
 
 ---
 
 ## Part B — Assets
 
-Paste exact prefab paths. Anything left blank becomes a placeholder and is flagged in the brief's
-asset register.
-
-| ID | Asset | Path |
-|---|---|---|
-| A1 | Air-raid siren | |
-| A2 | Water-exit cue | |
-| A3 | Bus / post-boost vehicle | |
-| A4–A7 | Booster plume ×4 | |
-| A8 | Separation flash | |
-| A9 | Pink/purple smoke | |
-| A10 | Nuclear FX layers (flash / fireball / shockwave / stem / canopy / dust) | |
-
-Two prefabs are already confirmed and need no answer:
-
-- Missile: `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab`
-- MIRV: `assets/content/vehicles/mlrs/rocket_mlrs.prefab`
+| ID | Asset | Path | Status |
+|---|---|---|---|
+| A1 | Air-raid siren | `assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab` | ✅ given |
+| A2 | Water-exit cue | `assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab` | ✅ given |
+| A3 | Bus | `assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab` | ✅ given — spawnability unverified |
+| A4 | Booster plume | `assets/prefabs/npc/m2bradley/oilfireball2.prefab` | ✅ given — `FireBall` entity, needs neutering |
+| A5 | Separation flash | — | ❌ ours to choose in the FX pass |
+| A6 | Pink/purple smoke | — | ❌ Q13 |
+| A7 | Nuclear FX layers | — | ⏳ FX pass (Q7) |
+| A8 | Missile body | `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab` | ✅ given |
+| A9 | MIRV | `assets/content/vehicles/mlrs/rocket_mlrs.prefab` | ✅ given |
+| A10 | Map marker | `assets/prefabs/tools/map/genericradiusmarker.prefab` | ✅ chosen (Q16 to confirm) |
 
 ---
 
 ## Part C — Probes
 
-A probe is a **short, disposable test on the live server that answers a question the documentation
-cannot**. Each one either unlocks a design decision or kills a risky assumption before it becomes
-code. Five in total; about 20 minutes.
+A probe is a short disposable test that answers something the documentation cannot. **Ten probes,
+about 45 minutes.** They run from one admin-only plugin.
 
-They exist because four things in this design depend on engine behaviour that is *not* documented and
-that I will not guess:
+**Install once**
 
-1. whether the missile prefab can actually be spawned,
-2. whether a CCTV camera keeps working when it is attached to something that moves,
-3. whether `ddraw.clear` exists on the client,
-4. whether a broadcast effect is audible at the far side of the map,
-5. whether a Harmony prefix can suppress the vanilla supply drop cleanly.
+1. Copy `probes/TheatricalNukeProbe.cs` into `carbon/plugins/`.
+2. Run `c.reload TheatricalNukeProbe`.
+3. Confirm it appears in `c.plugins`.
+4. In game, the commands are `/probe …` in chat, admin only.
 
-Run them in this order. R1 is the one that can invalidate the most work, so do it first.
+If Carbon reports a compile error, send me the file and line — the probe has never been compiled
+(there is no .NET toolchain in this environment). Delete the `R5` region if the error is about
+`HarmonyLib`; every other probe works without it.
 
----
-
-### Before you start (R0 — environment)
-
-Capture once, paste into Part D:
-
-- `c.version` output
-- the Rust build/protocol from the server startup banner
-- map size and seed (from your startup command)
-- `c.plugins` — count is enough
-- whether this is a test server or the live one
-
-**Use a test server for R5.** It patches every supply signal while enabled.
+| # | Probe | Command | Time |
+|---|---|---|---|
+| R1 | Missile prefab | `/probe missile` | 3 min |
+| R2 | CCTV on a moving parent | `/probe cctv` → bookmark → walk | 5 min |
+| R3 | `ddraw.clear` | `/probe ddraw` then `ddraw.clear` in F1 | 2 min |
+| R4 | Broadcast sound reach | `/probe fx <siren prefab> x y z` | 5 min |
+| R5 | Supply-drop suppression | `/probe supply on` → throw signal | 5 min |
+| R6 | Siren pulses + late join | `/probe siren [x y z]` | 6 min |
+| R7 | Marker visible to everyone | `/probe marker` + a second player | 4 min |
+| R8 | Bus prefab spawnability | `/probe bus` | 3 min |
+| R9 | `FireBall` plumes | `/probe plume` | 5 min |
+| R10 | Safe-zone behaviour | one MLRS rocket at a safe-zone edge | 6 min |
 
 ---
 
-### R1 — Can the missile prefab be spawned? *(5 minutes)*
+### R1 — Missile prefab *(3 min)*
 
-**The unknown.** `nuclear_silo_missile.prefab` exists in the client assets. It may be a decorative
-mesh with no `BaseEntity` component, in which case `CreateEntity` returns `null` and the missile
-cannot simply be spawned like a normal entity.
+**Unknown:** does `nuclear_silo_missile.prefab` have a `BaseEntity`, and can it be spawned?
 
-**Why it matters.** If it cannot be spawned, the whole visual needs a wrapper (a scene object
-parented to an invisible entity), which changes the rig design before any of it is written.
+**Steps:** stand in the open, `/probe missile`, watch console and the space 8 m ahead.
 
-**How.**
-
-1. Copy `probes/TheatricalNukeProbe.cs` to `carbon/plugins/`.
-2. `c.reload TheatricalNukeProbe` (or wait for auto-load). Confirm it appears in `c.plugins`.
-3. Stand somewhere flat and open, in daylight.
-4. `/probe missile`
-5. Watch the console and look in front of you.
-
-**What you should see.**
-
-| Console line | Meaning |
-|---|---|
-| `FindPrefab -> NULL` | The server cannot load that path at all — path is wrong for this build. |
-| `BaseEntity component -> NONE` | The prefab is decorative; it needs a wrapper. |
-| `BaseEntity component -> <class>` | It is a real entity; note the class name. |
-| `CreateEntity -> NULL` | Not spawnable as an entity despite having components. |
-| `Spawn() -> OK` + a visible missile | Best case: it spawns and looks right. |
-
-**Report:** the console lines, whether you can see it, and — if visible — whether it is upright, the
-right size, and which way it faces.
+**Record:** `FindPrefab` result, the component list, whether `CreateEntity` succeeded, the entity
+class, and whether you can see it. If visible: upright? right size? facing which way?
 
 ---
 
-### R2 — Does a CCTV camera work on a moving parent? *(5 minutes)*
+### R2 — CCTV on a moving parent *(5 min)*
 
-**The unknown.** Whether a plugin-spawned `cctv.static` can be parented to a moving object and still
-produce a usable, following feed — and how a player selects it.
+**Unknown:** does a plugin-spawned `cctv.static` work when parented to something that moves, and how
+does a player select it?
 
-**Why it matters.** The camera is a core beat ("view from the side of the missile"). If parenting
-does not work, the camera must be driven as its own entity following the rig, which is a different
-implementation.
+**Steps:** `/probe cctv` → note the identifier in chat → sit at a computer station → add the
+identifier as a bookmark → watch; then **walk, jump and turn** → `/probe cctvstop`.
 
-**How.**
-
-1. Stand in the open. `/probe cctv`
-2. Note the **identifier** printed in chat (something like `CCTV_1234567`).
-3. Sit at a computer station. Add a bookmark using that identifier.
-4. Watch the feed. It should be looking back at you from 3 m away.
-5. **Walk around, jump, turn.** The feed is parented to you, so the image should move with you.
-6. `/probe cctvstop` when done.
-
-**What to report.**
-
-- Did the identifier get accepted by the station?
-- Did the feed appear, and was it the right way up?
-- Did it **follow** you when you moved, or stay fixed in the world?
-- Any lag, stutter or black frames?
-- Console lines: `IsStatic`, `ConsumptionAmount`, `SetParent(...) -> OK`.
-
-**If the feed never appears**, note whether the camera looked unpowered — that changes how we spawn
-it.
+**Record:** accepted by the station? feed appeared? right way up? did it **follow** you? lag or black
+frames? The console prints `ConsumptionAmount` and the `SetParent` result.
 
 ---
 
-### R3 — Does `ddraw.clear` exist? *(2 minutes, no plugin)*
+### R3 — `ddraw.clear` *(2 min)*
 
-**The unknown.** Whether the client has a clear command for debug drawing, or whether drawings can
-only be cleared by letting them expire.
+**Unknown:** can debug lines be cleared on demand?
 
-**Why it matters.** Your requirement says "add a command to clear the debug lines". If there is no
-clear, the command has to stop the refresh loop and tell the admin when the lines disappear.
+**Steps:** `/probe ddraw` in chat, then immediately type `ddraw.clear` in the F1 console.
 
-**How.**
-
-1. In game, press **F1** to open the console.
-2. Paste: `ddraw.line 10 1 0 0 0 0 0 10`
-   (duration 10 s, red, from origin to origin+10 up — this draws in the world, not at your feet, so
-   use `/probe ddraw` instead if you want something visible near you).
-3. Better: run `/probe ddraw` in chat, then immediately type `ddraw.clear` in F1.
-
-**Report:** did the lines disappear immediately, or did the console say "unknown command"?
+**Record:** did the lines vanish, or "unknown command"?
 
 ---
 
-### R4 — Is a broadcast effect audible across the map? *(5 minutes)*
+### R4 — Broadcast sound reach *(5 min)*
 
-**The unknown.** `broadcast: true` sends the effect to every client (verified in source), but the
-client plays it positionally. We need to know how far it actually carries.
+**Unknown:** how far does a broadcast effect actually carry?
 
-**Why it matters.** It decides whether the siren design is "a few anchors" or "a per-player layer as
-well" (Q2 option D).
+**Steps:** `/probe fx assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab` (plays 2 km
+ahead of you). Repeat with coordinates at the far corner and stand at your original spot.
 
-**How.**
-
-1. Stand at one corner of the map. Note your grid.
-2. `/probe fx <siren-prefab> <x> <y> <z>` with coordinates at the **opposite** corner.
-   - Don't know coordinates? Use the default: `/probe fx <prefab>` plays it 2 km in front of you.
-3. Listen. Then repeat, standing at the far corner and playing it at your original position.
-4. If you have a candidate siren prefab, use it; otherwise use a loud known effect such as
-   `assets/bundled/prefabs/fx/impacts/additive/explosion.prefab` to test the *mechanism*.
-
-**Report:** audible yes/no at each distance, roughly how loud, and whether the sound was delayed
-(it should be immediate — the delay is a client audio feature, not the network).
+**Record:** audible at 2 km? at the map edge? how loud? Any delay?
 
 ---
 
-### R5 — Can we suppress the vanilla supply drop? *(5 minutes, test server only)*
+### R5 — Supply-drop suppression *(5 min, test server only)*
 
-**The unknown.** Whether a Harmony prefix on `SupplySignal.Explode` cleanly prevents the cargo plane,
-with no side effects.
+**Unknown:** does a Harmony prefix on `SupplySignal.Explode` cleanly stop the cargo plane?
 
-**Why it matters.** It is Q1's implementation. `SupplySignal.Explode()` creates the cargo plane
-directly (`CreateEntity(EntityToCreate)`), so there is no hook to cancel it *before* the plane exists.
+**Steps:** `/probe supply on` → throw a supply signal → observe. `/probe supply off` → throw another.
 
-**How.**
+**Record:** plane present/absent in each step; console shows `[R5] SupplySignal.Explode intercepted`;
+any errors.
 
-1. `/probe supply on`
-2. Throw a supply signal somewhere visible.
-3. Watch: **no cargo plane** should spawn, and the console should print
-   `[R5] SupplySignal.Explode intercepted`.
-4. `/probe supply off`
-5. Throw another — the cargo plane should return.
+---
 
-**Report:** plane present/absent in each step, plus any console errors.
+### R6 — Siren pulses and late join *(6 min)*
 
-**If the probe plugin fails to compile**, the error will name the file and line. Send it and skip R5;
-R1–R4 do not depend on it.
+**Unknown:** does the pulsing model actually sound continuous, and does someone who arrives late hear
+it?
+
+**Steps:**
+1. `/probe siren` (plays 400 m ahead, pulses every 8 s for 40 s).
+2. Listen and note how long each sound lasts, and whether the pulses overlap into one continuous siren.
+3. Log out, log back in mid-sequence (or have a second player join then) — do they hear the next pulse?
+4. Walk out of range and back in — does it return?
+
+**Record:** audible distance, pulse length, whether 8 s is right, late-join result.
+
+---
+
+### R7 — Marker visibility *(4 min)*
+
+**Unknown:** is a plugin-spawned `genericradiusmarker` visible to everyone?
+
+**Steps:** `/probe marker` → look at the map yourself → ask a second player (who is nowhere near you)
+to look at their map.
+
+**Record:** do both of you see a purple 60 m circle at your feet? Does it move if you walk? (The probe
+spawns it unparented; movement is tested in M1.)
+
+---
+
+### R8 — Bus prefab *(3 min)*
+
+**Unknown:** is `nuclear_warhead.prefab` an entity or an FX-only prefab?
+
+**Steps:** `/probe bus`.
+
+**Record:** `BaseEntity component → …`; if it is an entity, does it spawn and what does it look like?
+If it is FX-only, `CreateEntity` returns null and we need a carrier entity.
+
+---
+
+### R9 — `FireBall` plumes *(5 min)*
+
+**Unknown:** can `oilfireball2` be used as a booster plume without damage, spreading, or falling off?
+
+**Steps:** `/probe plume` (spawns 4 neutered fireballs parented to you). Walk around. Stand next to a
+wooden structure and see whether it ignites. Check server performance briefly.
+
+**Record:** do they follow you? do they look like booster flames? any fire spread or damage? any
+console errors? `/probe plumestop` afterwards.
+
+---
+
+### R10 — Safe-zone behaviour *(6 min)*
+
+**Unknown:** what happens when an MLRS rocket reaches a safe zone?
+
+**Steps:** on a test server, spawn `rocket_mlrs` aimed at the edge of a safe zone (use an admin
+command or ask me for a small probe extension), or simply fire a vanilla MLRS at the boundary.
+
+**Record:** does the rocket explode, fizzle, or vanish? does the safe zone take damage? do players
+inside take damage? This decides Q17.
 
 ---
 
 ## Part D — Report template
-
-Copy this into chat or a text file and fill it in. Partial answers are fine — send what you have.
 
 ```text
 ## Environment (R0)
@@ -466,42 +303,41 @@ Copy this into chat or a text file and fill it in. Partial answers are fine — 
 - Map size / seed:   <...>
 - Server:            test / live
 
-## Answers
-Q1  (supply drop):        A / B / C
-Q2  (siren prefab):       A / B / C / D   path: ...
-Q2b (coverage):           anchors / per-player / both
-Q3  (water-exit):         path: ...
-Q4  (bus/plumes/sep):     paths: ...  or "placeholders"
-Q5  (acquisition):        A / B / C / D
-Q6  (map markers):        A / B / C
-Q7  (blast scale):        A / B / C   lethal radius: ... m  structures: destroy / damage
-Q8  (camera viewers):     A / B / C / D
-Q10 (target limits):      A / B / C / D
-Q11 (80/95 %):            altitude / path
-Q12 (booster at swap):    A / B / C
-Q13 (smoke colour):       A / B / C   path: ...
-Q14 (camera bookmark):    A / B / C
-Q15 (FP meaning):         A / B
+## Remaining answers
+Q13 (pink smoke):      A / B / C   path: ...
+Q14 (camera select):   A / B / C
+Q15 (FP):              A / B
+Q16 (marker sub):      A / B
+Q17 (safe zone):       A / B / C / D
+Q18 (marker size):     A / B / C
 
 ## Probes
-R1 missile:   FindPrefab=...  component=...  CreateEntity=...  visible=yes/no  notes=...
-R2 cctv:      identifier=...  accepted=yes/no  followed=yes/no  lag=...  notes=...
-R3 ddraw:     clear worked=yes/no  error=...
-R4 siren:     at 2 km=...  at map corner=...  notes=...
-R5 supply:    suppressed=yes/no  plane returned=yes/no  errors=...
+R1  missile:   FindPrefab=...  component=...  CreateEntity=...  visible=yes/no  notes=...
+R2  cctv:      id=...  accepted=yes/no  followed=yes/no  lag=...  notes=...
+R3  ddraw:     clear worked=yes/no  error=...
+R4  sound:     2 km=...  map edge=...  loudness=...
+R5  supply:    suppressed=yes/no  plane returned=yes/no  errors=...
+R6  siren:     audible at=... m  pulse length=... s  continuous=yes/no  late join=yes/no
+R7  marker:    seen by you=yes/no  seen by other=yes/no
+R8  bus:       BaseEntity=...  spawned=yes/no  looks like=...
+R9  plume:     followed=yes/no  fire spread=yes/no  damage=yes/no  look=...
+R10 safe zone: exploded / fizzled / vanished; damage=yes/no
 ```
 
 ---
 
-## What happens with the answers
+## What each answer unlocks
 
-| Answer | Effect |
+| Answer | Unlocks |
 |---|---|
-| Q1, Q2b, Q5, Q8, Q10, Q12, Q14 | Close the decision; `DESIGN_BRIEF.md` §7 config and §13 are updated. |
-| Q2, Q3, Q4, Q13 | Fill the asset register; prefabs are validated at load. |
-| Q6, Q7, Q11, Q15 | Tune defaults; no structural change. |
-| R1 fails | Rig design switches to the wrapper approach before M3 starts. |
-| R2 fails | Camera becomes a free-flying entity following the rig; FR-60/61 change. |
-| R3 fails | `/nuke debug clear` becomes "stop refresh + report expiry" (§8.3 fallback). |
-| R4 fails at map edge | Add the per-player audio layer (Q2 option D). |
-| R5 fails | Suppression moves to intercepting the throw; Q1 answer may change. |
+| Q13 | FR-10 target marker; asset register complete |
+| Q14 | Camera UX in M4 (FR-65) |
+| Q16 | Marker implementation in M3 (FR-29) |
+| Q17 | Safe-zone logic in M1 validation + M5 blast |
+| R1 | Whether M3 needs the wrapper rig |
+| R2 | Whether the camera is parented or free-flying |
+| R6 | Pulse interval and anchor spacing defaults |
+| R7 | Whether markers work server-wide |
+| R8 | Whether the bus is an entity or an FX |
+| R9 | Whether plumes are `FireBall` entities or FX |
+| R10 | The answer to Q17 |
