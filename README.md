@@ -12,6 +12,8 @@ Reference set for building C# Rust server plugins on **Carbon** (with a **Harmon
 | `DontJustRollWithIt.MD` | Working agreement: evidence tags, when to stop and ask, environment profile, hand-off/feedback packets, decision log. |
 | `RESEARCH_REVIEW.MD` | Source recency/accuracy audit and corrections. |
 | `DESIGN_BRIEF.md` | **Product source of truth** for Theatrical Nuke: vision, storyboard, requirements, config, debug tooling, open questions. |
+| `M0_PROBES.md` | Milestone 0 working kit: one-question-at-a-time answer sheet, asset request table, five live-server probe protocols, report template. |
+| `probes/TheatricalNukeProbe.cs` | Disposable probe plugin for the above (missile spawn, CCTV parenting, broadcast FX, supply suppression). |
 
 **Read order:** `DontJustRollWithIt.MD` (how we work) → `CARBON_PLUGIN_PLAYBOOK.MD` (the process) →
 the reference that the task needs. When building the current product, start at `DESIGN_BRIEF.md`:

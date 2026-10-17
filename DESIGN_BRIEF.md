@@ -550,6 +550,10 @@ Rust plugin can have. It follows `Exceptions.md` without exception:
 These block or shape M1. Each has a recommendation; the default is what will be built if the answer
 is "you decide".
 
+**Answer one at a time in `M0_PROBES.md` Part A** — it restates each question self-contained, with
+options and an answer line. Probe instructions and the report template are in Part C/D of the same
+file.
+
 | # | Question | Recommendation (default) |
 |---|---|---|
 | Q1 | Does throwing the football still trigger the vanilla supply drop? | **Suppress it.** The football is a dedicated item; a cargo plane would confuse the beat sheet. |
@@ -564,6 +568,9 @@ is "you decide".
 | Q10 | Target validation: safe zones, monuments, water, out-of-bounds? | Refuse safe zones; allow everywhere else in-bounds with a warning; water → no strike (nothing to hit). |
 | Q11 | Is "80 % / 95 % of apogee" an altitude fraction or a path fraction? | **Altitude fraction** (simplest, matches "Y level 1000"). |
 | Q12 | What happens to the booster at hand-off — killed instantly? | Killed in the same tick the bus spawns and the camera moves; a separation flash covers it. |
+| Q13 | Pink/purple smoke: is there a coloured-smoke prefab? | Operator supplies it; otherwise accept the vanilla smoke colour for v1. |
+| Q14 | How does a player select a camera that is nowhere near a station? | Plugin force-adds the bookmark and prints the camera ID in chat. |
+| Q15 | "FP" = first-person debug overlay? | Yes — `ddraw` primitives drawn in the triggering admin's own view. |
 
 ---
 
