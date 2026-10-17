@@ -11,7 +11,8 @@
 //   /probe bus                  R8b — the nuclear_warhead prefab specifically
 //   /probe cctv                 R2  — CCTV parented to you; prints its bookmark identifier
 //   /probe cctvstop             R2  — remove it
-//   /probe siren [x y z]        R6  — pulse the air-raid sound at a point for 40 s
+//   /probe siren [x y z]        R6  — pulse the air-raid sound via Effect.server.Run (run 1: REJECTED by engine)
+//   /probe spawn <path>         R6b — spawn an asset path as an entity; prints components (AudioSource?)
 //   /probe marker               R7  — spawn the generic-radius map marker at your feet
 //   /probe markerstop           R7  — remove it
 //   /probe plume                R9  — 4 neutered FireBalls parented to you
@@ -342,7 +343,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         try
         {
             Effect.server.Run(SirenPrefab, pos, Vector3.up, null, true);
-            Puts("pulse 1 sent");
+            Puts("pulse 1 submitted to Effect.server.Run (no return value: check the console for 'unknown effect' lines)");
         }
         catch (Exception ex)
         {
@@ -355,7 +356,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             try
             {
                 Effect.server.Run(SirenPrefab, pos, Vector3.up, null, true);
-                Puts("siren pulse sent");
+                Puts("siren pulse submitted (check for 'unknown effect' lines above)");
             }
             catch (Exception ex)
             {
@@ -507,8 +508,8 @@ public class TheatricalNukeProbe : CarbonPlugin
         try
         {
             Effect.server.Run(prefab, pos, Vector3.up, null, true);
-            Puts("Effect.server.Run(..., broadcast: true) -> sent");
-            player.ChatMessage($"R4: played at {distance:0} m. Listen; then repeat from the far corner.");
+            Puts("Effect.server.Run(..., broadcast: true) submitted (no return value: check for 'unknown effect' lines above)");
+            player.ChatMessage($"R4: submitted at {distance:0} m. Silence + an 'unknown effect' console line means the path is not in the effect pool."); 
         }
         catch (Exception ex)
         {
