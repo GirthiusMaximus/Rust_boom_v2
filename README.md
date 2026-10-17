@@ -11,9 +11,11 @@ Reference set for building C# Rust server plugins on **Carbon** (with a **Harmon
 | `Exceptions.md` | Exception standard: boundary guards, global guard, separate per-plugin exception log, ready-to-use code for plugins/extensions/HarmonyMods, fault-injection tests. |
 | `DontJustRollWithIt.MD` | Working agreement: evidence tags, when to stop and ask, environment profile, hand-off/feedback packets, decision log. |
 | `RESEARCH_REVIEW.MD` | Source recency/accuracy audit and corrections. |
+| `DESIGN_BRIEF.md` | **Product source of truth** for Theatrical Nuke: vision, storyboard, requirements, config, debug tooling, open questions. |
 
 **Read order:** `DontJustRollWithIt.MD` (how we work) → `CARBON_PLUGIN_PLAYBOOK.MD` (the process) →
-the reference that the task needs.
+the reference that the task needs. When building the current product, start at `DESIGN_BRIEF.md`:
+it says what is being built, the playbook says how.
 
 **Rule:** evidence or assumption — never a silent guess. See `DontJustRollWithIt.MD`.
 
