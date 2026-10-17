@@ -454,20 +454,20 @@ compiled).
 
 | Need | Verified fact | Status |
 |---|---|---|
-| Map-wide effect delivery | `Effect.server.Run(name, pos, normal, connection, broadcast: true)` → `EffectNetwork.Send` → `BaseNetworkable.GlobalNetworkGroup.subscribers` = **every connected client**. | ✅ verified |
+| Map-wide effect delivery | `Effect.server.Run(name, pos, normal, connection, broadcast: true)` → `EffectNetwork.Send` → `BaseNetworkable.GlobalNetworkGroup.subscribers` = **every connected client**. **But** a string name must already be in the engine's string pool: an asset path not in the pool logs `unknown effect` and is dropped silently (R6 run 1). `Run` returns nothing, so failure is not detectable in code. | ⚠️ broadcast verified; **siren path failed** (D-2) |
 | MLRS MIRVs | `rocket_mlrs.prefab` = `MLRSRocket : TimedExplosive, SamSite.ISamSiteTarget`, has `ServerProjectile`; `ProjectileImpact` explodes and broadcasts ground FX; `ServerInit` creates a map marker and broadcasts launch FX. | ✅ verified |
 | Aiming an MIRV | `ServerProjectile.InitializeVelocity(Vector3)` is public; `speed`, `gravityModifier`, `initialVelocity` are public fields. | ✅ verified |
 | Vanilla MLRS reference numbers | `MLRS.rocketSpeed`, `MLRS.rocketBaseGravity`, `targetAreaRadius = 30 m`, `minRange = 200 m`. | ✅ verified |
 | Explosion control | `TimedExplosive.explosionRadius`, `damageTypes`, `explosionEffect`, `SetDamageScale(float)`. | ✅ verified |
 | Football item | `grenade.supplysignal.deployed.prefab` = `SupplySignal : TimedExplosive`. | ✅ verified |
 | Missile prefab exists | `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab` is present in the client asset tree. | ✅ file exists |
-| Missile prefab is spawnable | Its entity component is **unknown** — a decorative prefab may have no `BaseEntity`. | ⚠️ probe R1 |
-| Bus prefab spawnable | `nuclear_warhead.prefab` is not in the entity index, so it may be an FX prefab rather than an entity. | ⚠️ probe R8 |
+| Missile prefab is spawnable | **Verified NOT spawnable as an entity.** Root components are `Transform` + `MeshCollider`; `CreateEntity` returns null ("prefab isn't an entity"). Needs a carrier entity (D-1). | ❌ probe R1 run 1 |
+| Bus prefab spawnable | `nuclear_warhead.prefab` spawns as a plain `BaseEntity` (`Spawn()` OK). Visible geometry unconfirmed — no renderer on the root. | ✅ spawns; ⚠️ visuals (R8) |
 | CCTV on a moving parent | `CCTV_RC` exists (`cctv.static`, `cctv_deployed`); parenting to a moving entity and keeping the feed alive is **unverified**. | ⚠️ probe R2 |
 | CCTV discovery | A station only auto-gathers **static** cameras within `autoGatherRadius`; anything else must be added by identifier (`ForceAddBookmark`). Confirmed in `ComputerStation.GatherStaticCameras`. | ✅ verified |
 | Vanilla MLRS map marker is private | `MapMarkerMLRSRocket.ShouldNetworkTo` returns `player.userID == OwnerID` and `limitNetworking = true`: the marker is visible **only to the rocket's owner**, never to the server. Six vanilla markers cannot be shown to everyone. | ✅ verified — changes FR-29/FR-44 |
 | Generic map marker | `genericradiusmarker.prefab` = `MapMarkerGenericRadius` with public `radius`, `color1`, `color2`, `alpha` and `SendUpdate()`; no `ShouldNetworkTo` override, so it is not owner-limited. | ✅ verified (visibility still needs R7) |
-| `oilfireball2` is an entity | `oilfireball2.prefab` = `FireBall : BaseEntity` — `damagePerSecond = 2`, `radius = 0.5`, life 20–40 s, spreads fire. Usable as a plume only after neutering (damage 0, spread off), and it self-extinguishes. | ⚠️ probe R9 |
+| `oilfireball2` is an entity | `oilfireball2.prefab` = `FireBall : BaseEntity` — `damagePerSecond = 2`, `radius = 0.5`, life 20–40 s, spreads fire. Spawns and parents (R9 run 1); neutering applied; look/spread not yet reported. | ⚠️ probe R9 |
 | Debug drawing | `ddraw.line/arrow/sphere/text/box` via `SendConsoleCommand` (duration + colour). | ✅ verified pattern |
 | Clearing debug drawing | `ddraw.clear` — **not verified**. | ⚠️ probe R3 |
 
@@ -499,15 +499,15 @@ Rules:
 
 | # | Risk | Impact | Mitigation |
 |---|---|---|---|
-| R1 | Missile prefab has no entity component and cannot be spawned normally. | Blocks the whole visual. | Probe first. Fallback: wrap the prefab in a scene object parented to an invisible `BaseEntity` — verify on server. |
+| R1 | **Confirmed:** missile prefab is not an entity; `CreateEntity` returns null. | Blocks spawning the visual directly. | Decision D-1 (M0_PROBES Part E): invisible carrier `BaseEntity` with the missile prefab as a child; verify the child renders. |
 | R2 | CCTV cannot follow a fast-moving parent smoothly, or requires power/IO. | Camera requirement fails. | Probe with a spawned `cctv.static` parented to a moving dummy; measure. Fallback: drive the camera as a separate entity following the rig. |
 | R3 | `ddraw.clear` does not exist. | Debug lines linger. | Accept expiry-based clear (§8.3). |
-| R4 | Client culls/attenuates broadcast audio by distance. | Sirens inaudible at map edges. | Anchors in overlapping rings; verify reach per anchor (R6); add a per-player audio layer only if needed. |
+| R4 | **New:** `Effect.server.Run` cannot play the air-raid asset (not in the effect string pool). Client attenuation still unknown. | Sirens silent — the Q2 mechanism as written does not work. | Decision D-2 (M0_PROBES Part E): test the asset as an entity (R6b), else audition pooled effects. |
 | R5 | Large blast = thousands of entity kills in one tick. | Lag spike / disconnect. | Time-sliced kill budget (`Blast.EntitiesPerFrameBudget`). |
 | R6 | `FireBall` plumes damage, spread fire, or detach from a moving parent. | Damage where none should be; plumes left behind. | Neuter each ball (damage 0, radius 0, no spread) and parent it; verify with R9. Fallback: pure FX prefab attached via `Effect.server.Run`. |
 | R7 | Reload mid-flight. | Orphans, stuck cameras. | Recovery scan on load; `Cleanup` on unload; abort command. |
 | R8 | Prefab path changes after a Rust update. | Silent no-show. | Validate all prefabs at load; refuse to arm and log loudly. |
-| R9 | `nuclear_warhead.prefab` is an FX-only prefab with no entity. | The bus cannot be a spawnable body. | R8 spawn probe decides; fallback is an invisible carrier entity with the warhead effect attached. |
+| R9 | `nuclear_warhead.prefab` spawns but may have no visible geometry. | The bus is invisible. | Check visually (R8); fallback is a carrier entity with a visible child. |
 | R10 | Safe zones nullify the strike (vanilla rockets self-destruct on `TriggerSafeZone`, damage is blocked). | Q10's "real consequences" may not happen. | Verify in R10; decide between fizzle / deflection / bespoke handling (Q17). |
 
 ### 9.4 FX research pass (required before M5)
@@ -619,6 +619,9 @@ Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_P
 | Q16 | Confirm the marker approach: purple `genericradiusmarker` instead of a tiny MLRS rocket? | The rocket-marker idea cannot work server-wide (owner-only networking). | Purple radius marker on the missile and on each MIRV. |
 | Q17 | What does "real consequences" mean for a safe zone hit? Vanilla rockets self-destruct on safe-zone triggers and damage is blocked. | Decides whether a strike on Outpost/Bandit actually does anything. | Strike fizzles inside the safe-zone volume; log it and warn the caller. |
 | Q18 | Are the six MIRV markers allowed to be *ship-sized* circles, or should they read as small dots? | Visual taste. | Small (8 m) dots. |
+| Q19 | Siren route (D-2): spawn the air-raid asset as an entity (R6b), or audition vanilla pooled effects? | Q2 as written cannot play the asset. | R6b first. |
+| Q20 | Missile carrier (D-1): accept an invisible carrier entity with the missile prefab as a child? | Architecture of M3. | Yes. |
+| Q21 | Did `/probe bus` show anything 8 m in front (R8)? | Decides whether the bus needs a visible child. | Assume not visible until confirmed. |
 
 ### 13.3 Work items created by the answers
 
@@ -669,7 +672,7 @@ amended if reality disagreed.
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 2026-10-17 | Initial framework: storyboard, FRs, config sketch, feasibility probes, open questions. | Build agent |
-| 0.2 | 2026-10-17 | Operator answers recorded (Q1–Q12). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
+| 0.2 | 2026-10-17 | Operator answers recorded (Q1–Q12). Probe run 1: missile not an entity (R1), siren not playable via effects (R6), bus spawns (R8), supply intercept works (R5). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
 
 ---
 

@@ -341,3 +341,41 @@ R10 safe zone: exploded / fizzled / vanished; damage=yes/no
 | R8 | Whether the bus is an entity or an FX |
 | R9 | Whether plumes are `FireBall` entities or FX |
 | R10 | The answer to Q17 |
+
+---
+
+## Part E — Results log
+
+### Run 1 — 2026-10-17 (live test server, console pasted by operator)
+
+| Probe | Result | Verdict |
+|---|---|---|
+| **R1** missile | `FindPrefab` OK. Root components: `Transform`, `MeshCollider` — **no `BaseEntity`**. `CreateEntity` returns null: *"CreateEntity called on a prefab that isn't an entity!"* | ❌ **Not spawnable as an entity.** The missile needs a carrier entity (brief §9.3 R1 fallback) — decision D-1 below. |
+| **R2** CCTV | `CCTV_RC` spawned, `ConsumptionAmount` = 3, identifier **`COBALT1`**, `SetParent(player, worldPositionStays: true)` OK. | ⚠️ Spawn + parent work. **Follow test not yet reported** (add `COBALT1` at a station, walk/jump). |
+| **R3** ddraw | Lines sent for 30 s. | ⚠️ **`ddraw.clear` result not reported.** |
+| **R4** broadcast | Run with `fx siren` and `fx missile`: `"siren"` and `"missile"` are not asset paths. Engine: *"String ID is 0 – unknown effect"*. | ⚠️ **Invalid test — my usage error** (the command takes a full path). Re-run needed. |
+| **R5** supply | `give` of one supply signal; `[R5] SupplySignal.Explode intercepted; vanilla cargo plane suppressed.` | ✅ **Harmony prefix fires.** Plane absence still to be confirmed by eye. |
+| **R6** siren | Air-raid path passed to `Effect.server.Run` 5 times: *"StringPool.GetNumber – no number for string …airraidsound.prefab"*, *"String ID is 0 – unknown effect"*. | ❌ **Siren cannot be played through `Effect.server.Run`.** See D-2. The probe's "pulse sent" text is wrong — `Run` returns nothing, so the probe cannot detect the failure. |
+| **R7** marker | `genericradiusmarker` spawned, net id 6796684. | ⚠️ **Visibility to a second player not reported.** |
+| **R8** bus | `nuclear_warhead.prefab`: `FindPrefab` OK, root component `BaseEntity` only; `CreateEntity` and `Spawn()` OK, net id 6797210. | ✅ **Spawnable.** ⚠️ Whether anything is *visible* (child meshes?) not reported. |
+| **R9** plumes | 4 × `FireBall` spawned and parented. | ⚠️ **Look/follow/fire-spread not reported.** |
+| **R10** safe zone | Not run. | ⏳ |
+
+Other log lines: `Curl error 7 … cdp.cloud.unity3d.com` is Unity telemetry failing — unrelated to the probe.
+The `/probe spawn missile` and `/probe fx missile` lines were my usage error; the probe expects full paths.
+
+**Cleanup still needed on the test server:** `/probe cctvstop` (CCTV), `/probe markerstop` (marker and the four plumes). Plumes self-expire after 300 s.
+
+### Decisions this run creates
+
+| # | Decision | Options | Recommendation |
+|---|---|---|---|
+| **D-1** | Missile body (R1) | (a) Invisible carrier `BaseEntity` with the missile prefab attached as a child (verify the child's visuals render); (b) spawn the missile prefab's *meshes* only and move them with our own transform updates. | (a) — entities are networked and parentable; (b) bypasses the network model. |
+| **D-2** | Siren playback (R6) | (a) Spawn `airraidsound.prefab` as an **entity** and check it has an audio source (new probe R6b); (b) find a vanilla **effect** prefab already in the effect pool that plays a siren-like sound (audition); (c) both, in order. | (c): R6b first, since it is one command. |
+| **D-3** | Probe honesty | Change the probe so it reports `FindPrefab` + `GetComponent` results before playing, and stops claiming "sent" for effects. | Yes — I'll make this change. |
+
+### Next probe (R6b) — siren as entity
+
+`/probe spawn assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab`, then read the console for:
+the components list (look for `AudioSource`), and whether `CreateEntity` returns an entity.
+Listen 8 m away; then walk 200 m, 800 m, 1900 m away and note audibility.
