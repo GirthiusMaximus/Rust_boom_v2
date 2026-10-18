@@ -1,0 +1,11 @@
+﻿########## PROBE R9 START ########## v0.3.0 args=[] operator=76561197972272401
+[10:45:19.486] [PROBE R9] STEP     plume 1 at -6.0 m lateral offset from the operator's line
+[10:45:19.486] [PROBE R9] STEP     plume 2 at -2.0 m lateral offset from the operator's line
+[10:45:19.486] [PROBE R9] STEP     plume 3 at 2.0 m lateral offset from the operator's line
+[10:45:19.486] [PROBE R9] STEP     plume 4 at 6.0 m lateral offset from the operator's line
+[10:45:19.487] [PROBE R9] RESULT   4 plumes spaced 4.0 m, parented. Report: count visible, follow, look, fire spread.
+[10:46:00.446] [PROBE R9] CLEANUP  OK   kill plume 4: killed; IsDestroyed=True
+[10:46:00.446] [PROBE R9] CLEANUP  OK   kill plume 3: killed; IsDestroyed=True
+[10:46:00.446] [PROBE R9] CLEANUP  OK   kill plume 2: killed; IsDestroyed=True
+[10:46:00.447] [PROBE R9] CLEANUP  OK   kill plume 1: killed; IsDestroyed=True
+########## PROBE R9 END ########## outcome=ended by operator; cleanup=OK; duration=41.0s

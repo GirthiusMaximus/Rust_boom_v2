@@ -1,0 +1,7 @@
+﻿########## PROBE R5 START ########## v0.3.0 args=[] operator=76561197972272401
+[10:34:14.486] [PROBE R5] STEP     armed. Throw one Supply Signal. Expect: smoke at the landing point, NO cargo plane, signal stays until its 210 s FinishUp.
+[10:34:14.486] [PROBE R5] STEP     Report: smoke yes/no, plane yes/no, signal lifetime. Each intercept is logged below as INTERCEPT.
+[10:34:36.901] [PROBE R5] INTERCEPT SupplySignal at (-2037.97, 5.20, 865.86); cargo plane suppressed; Flags.On set; FinishUp in 210 s
+[10:39:14.498] [PROBE R5] CLEANUP  OK   unpatch theatricalnuke.probe: unpatched
+[10:39:14.499] [PROBE R5] CLEANUP  OK   disarm R5 prefix: disarmed
+########## PROBE R5 END ########## outcome=auto-ended after 300 s timeout; cleanup=OK; duration=300.0s

@@ -428,3 +428,16 @@ Carbon could not resolve `AudioSource` (it lives in `UnityEngine.AudioModule`, w
 - **Q2** plume damage: **0** (decided).
 - **Q3** football smoke life: operator answered "15 s". This may refer to the siren delay rather than the smoke. **Needs confirmation** (see chat).
 - **Q4** leftover siren entity: none spawned by the operator. Operator has used `spawnat airraidsound` with success in the past, which suggests the entity route works.
+
+
+### Run 4 — operator logs (probes/logs/run-4/, v0.3.0)
+
+| Probe | Result | Verdict |
+|---|---|---|
+| **R2** | 98 `CCTV_RC` on the server. `COBALT1` is used by **32** of them (monument cameras). Our camera also got `COBALT1`, the prefab default. The station opened a monument camera. | ❌ default identifier is not unique. Fix: `rcIdentifier = "NUKECAM#ID"` before `Spawn()` (engine replaces `#ID` with the net id). Verify in run 5. |
+| **R5** | Smoke shows on the target, no plane, lasts ~210 s. | ✅ plane suppressed, smoke works. Lifetime to be set to 15 s (Q3). |
+| **R6b** | Entity spawned as a plain `BaseEntity`. **0 `AudioSource` components** on the prefab or live entity. Operator heard it and stopped at (-1448.57, 187.36, -1115.75). Spawn was at (-2039.04, 9.75, 870.24). | ✅ audible. **Hearing distance ≈ 2080 m** from the spawn point (one measurement). The sound is not an `AudioSource`, so R6c audits components. |
+| **R7** | Radius 25 tinted the **whole map**. Radius 5 was "fairly large" but did not cover the map. | ❌ radius unit unknown. Sweep 0.5 / 1 / 2 / 3 / 5 in v0.4. |
+| **R9** | Plumes spawned on top of the operator again. Not judgeable. | ❌ spawn 5 m in front, log positions before and after `SetParent`, compare static and follow modes. |
+
+**Q3 (smoke life):** the operator's answer is **15 s**. Configured as `Visuals.SmokeSeconds`, not hard-coded. The vanilla value is 210 s.

@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.3.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.4.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -13,7 +13,7 @@
 //   /probe <ID> end [observation...]   end it: your observation is logged, cleanup runs
 //   /probe abort                       end whatever is running, with cleanup
 //   /probe status | /probe help
-// IDs: R0 R1 R2 R3 R4 R5 R6 R6b R7 R8 R9 R10
+// IDs: R0 R1 R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -27,6 +27,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using Carbon.Plugins;
 using HarmonyLib;
@@ -35,11 +36,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.3.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.4.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.3.0";
+    private const string Version = "0.4.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -51,11 +52,12 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const string MarkerPrefab = "assets/prefabs/tools/map/genericradiusmarker.prefab";
     private const string PlumePrefab = "assets/prefabs/npc/m2bradley/oilfireball2.prefab";
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R7", "R8", "R9", "R10" };
-    private static readonly float[] MarkerRadii = { 5f, 25f, 60f };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10" };
+    private static readonly float[] MarkerRadii = { 0.5f, 1f, 2f, 3f, 5f };
 
     private static TheatricalNukeProbe _instance;
     private static bool _r5Armed;
+    private static float _r5SmokeSeconds = 15f;
 
     private ProbeRun _active;
     private Harmony _harmony;
@@ -167,7 +169,8 @@ public class TheatricalNukeProbe : CarbonPlugin
     {
         player.ChatMessage("Probes: R0 R1 R2 R3 R4 R5 R6 R6b R7 R8 R9 R10");
         player.ChatMessage("Start: /probe <ID> [args]    End: /probe <ID> end <observation>");
-        player.ChatMessage("R4 <path> [x y z]   R6 [metres]   R6b [path] [x y z]   R7 (radius sweep)   R9 [spacing]");
+        player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
+        player.ChatMessage("R7 (radius sweep 0.5-5)   R9 [spacing] [static|follow]");
         player.ChatMessage("Also: /probe status, /probe abort");
     }
 
@@ -209,6 +212,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R5": ProbeR5(run, op); break;
                 case "R6": ProbeR6(run, op); break;
                 case "R6b": ProbeR6b(run, op); break;
+                case "R6c": ProbeR6c(run, op); break;
                 case "R7": ProbeR7(run, op); break;
                 case "R8": ProbeR8(run, op); break;
                 case "R9": ProbeR9(run, op); break;
@@ -452,40 +456,42 @@ public class TheatricalNukeProbe : CarbonPlugin
     }
 
     // ── R2: CCTV identifiers and parenting ───────────────────────────────────────────────────────
+    // Run 3 showed the default identifier COBALT1 is shared by many monument cameras (32 on this server).
+    // PoweredRemoteControlEntity.Spawn() replaces a "#ID" token with the entity's net id, so a template
+    // "NUKECAM#ID" gives a unique identifier. Set before Spawn(). IsValidIdentifier: alphanumeric, <= 32 chars.
     private void ProbeR2(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 600f;
 
         var existing = UnityEngine.Object.FindObjectsOfType<CCTV_RC>();
-        var ids = new List<string>();
-        foreach (var cam in existing)
-        {
-            if (cam == null) continue;
-            var id = ((IRemoteControllable)cam).GetIdentifier();
-            ids.Add(id);
-            Line(run, "STEP", $"existing CCTV_RC id={id} pos={cam.transform.position} static={cam.IsStatic()}");
-        }
+        var ids = existing.Where(c => c != null).Select(c => ((IRemoteControllable)c).GetIdentifier()).ToList();
+        var dups = ids.GroupBy(x => x).Where(g => g.Count() > 1).OrderByDescending(g => g.Count())
+            .Select(g => $"{g.Key} x{g.Count()}").ToArray();
+        Line(run, "STEP", $"survey: {ids.Count} CCTV_RC, {ids.Distinct().Count()} distinct identifiers; duplicated: " +
+                          (dups.Length == 0 ? "none" : string.Join(", ", dups)));
 
-        var duplicates = ids.GroupBy(x => x).Where(g => g.Count() > 1).Select(g => $"{g.Key} x{g.Count()}").ToArray();
-        Line(run, "STEP", $"survey: {ids.Count} CCTV_RC on the server; duplicate identifiers: {(duplicates.Length == 0 ? "none" : string.Join(", ", duplicates))}");
-
-        var cctv = GameManager.server.CreateEntity(CctvPrefab, InFront(p, 3f, 1.5f), Quaternion.LookRotation((p.transform.position - InFront(p, 3f, 1.5f)).normalized, Vector3.up)) as CCTV_RC;
+        var spawnAt = InFront(p, 3f, 1.5f);
+        var cctv = GameManager.server.CreateEntity(CctvPrefab, spawnAt,
+            Quaternion.LookRotation((p.transform.position - spawnAt).normalized, Vector3.up)) as CCTV_RC;
         if (cctv == null)
         {
             Line(run, "RESULT", "CreateEntity returned null or not a CCTV_RC");
             return;
         }
 
+        Line(run, "STEP", $"prefab identifier before spawn='{cctv.rcIdentifier}'; setting template 'NUKECAM#ID'");
+        cctv.rcIdentifier = "NUKECAM#ID";
         cctv.Spawn();
         Track(run, cctv, "cctv");
 
         var own = ((IRemoteControllable)cctv).GetIdentifier();
         var occurrences = ids.Count(x => x == own) + 1;
-        Line(run, "RESULT", $"own identifier={own}; occurrences including this camera={occurrences}");
+        Line(run, "RESULT", $"own identifier={own}; valid={ComputerStation.IsValidIdentifier(own)}; " +
+                            $"occurrences including this camera={occurrences}");
 
         cctv.SetParent(p, worldPositionStays: true);
         Line(run, "STEP", "parented to operator (worldPositionStays: true)");
-        Line(run, "STEP", "NEXT: add the identifier at a computer station. Then walk, jump, turn. Report the feed and which camera it shows.");
+        Line(run, "STEP", $"NEXT: at a computer station add '{own}' as a bookmark. Walk, jump, turn. Report the feed and which camera it shows.");
     }
 
     // ── R3: debug drawing ────────────────────────────────────────────────────────────────────────
@@ -535,6 +541,8 @@ public class TheatricalNukeProbe : CarbonPlugin
     private void ProbeR5(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 300f;
+        _r5SmokeSeconds = Math.Max(1f, ParseFloat(run.Args, 0) ?? 15f);
+        Line(run, "STEP", $"smoke will end {_r5SmokeSeconds:0} s after the throw (vanilla is 210 s; configured value per Q3 is 15 s)");
 
         _harmony = new Harmony(HarmonyId);
         _harmony.PatchAll(GetType().Assembly);
@@ -561,7 +569,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     {
         var run = _active;
         if (run == null || !run.Id.Equals("R5", StringComparison.Ordinal)) return;
-        Line(run, "INTERCEPT", $"SupplySignal at {signal.transform.position}; cargo plane suppressed; Flags.On set; FinishUp in 210 s");
+        Line(run, "INTERCEPT", $"SupplySignal at {signal.transform.position}; cargo plane suppressed; Flags.On set; FinishUp in {_r5SmokeSeconds:0} s");
     }
 
     // ── R6: siren through Effect.server.Run (run 1 and run 2 were negative) ─────────────────────
@@ -653,7 +661,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             var r = MarkerRadii[run.Counter];
             marker.radius = r;
             marker.SendUpdate();
-            Line(run, "STEP", $"radius={r} sent. Report what the map shows (size, and whether the whole map is tinted).");
+            Line(run, "STEP", $"radius={r} sent. Report: circle size vs map grid cells, and whether the whole map is tinted.");
             run.Counter++;
         });
     }
@@ -674,26 +682,33 @@ public class TheatricalNukeProbe : CarbonPlugin
         Line(run, "RESULT", $"spawned {e.GetType().Name} 8 m in front. Report whether it is visible.");
     }
 
-    // ── R9: FireBall plumes, spaced, neutered without a null spreadSubEntity ─────────────────────
+    // ── R9: FireBall plumes ──────────────────────────────────────────────────────────────────────
+    // args: [spacing metres, default 2] [static|follow, default static].
+    // Centre is 5 m in front of the operator. static = never parented. follow = parented after spawn;
+    // positions are logged before and after SetParent so we can see whether the offset survives.
     private void ProbeR9(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 300f;
-        var spacing = ParseFloat(run.Args, 0) ?? 4f;
-        var origin = InFront(p, 10f, 1f);
+        var spacing = ParseFloat(run.Args, 0) ?? 2f;
+        var mode = run.Args.Length > 1 ? run.Args[1].ToLowerInvariant() : "static";
+        var follow = mode == "follow";
+        var centre = InFront(p, 5f, 1f);
+
+        Line(run, "STEP", $"mode={(follow ? "follow (parent after spawn)" : "static (not parented)")} spacing={spacing:0.0} m centre={Pos(centre)}");
+        Line(run, "STEP", $"operator at {Pos(p.transform.position)}");
 
         for (var i = 0; i < 4; i++)
         {
-            var offset = p.transform.right * ((i - 1.5f) * spacing);
-            var fire = GameManager.server.CreateEntity(PlumePrefab, origin + offset, Quaternion.identity) as FireBall;
+            var target = centre + p.transform.right * ((i - 1.5f) * spacing);
+            var fire = GameManager.server.CreateEntity(PlumePrefab, target, Quaternion.identity) as FireBall;
             if (fire == null)
             {
                 Line(run, "STEP", $"plume {i + 1}: CreateEntity returned null or not a FireBall");
                 continue;
             }
 
-            // Neuter. spreadSubEntity is left untouched: setting it to null caused NullReferenceException
-            // in FireBall.TryToSpread (run 2). TryToSpread checks `Random < 0.9 - generation*0.1` first,
-            // so generation = 1000 makes that test false and short-circuits before spreadSubEntity is read.
+            // Neuter. spreadSubEntity is left untouched: setting it to null caused a NullReferenceException
+            // in FireBall.TryToSpread (run 2). generation = 1000 short-circuits the spread test.
             fire.damagePerSecond = 0f;
             fire.generation = 1000f;
             fire.canMerge = false;
@@ -702,13 +717,96 @@ public class TheatricalNukeProbe : CarbonPlugin
             fire.lifeTimeMax = 600f;
 
             fire.Spawn();
-            fire.SetParent(p, worldPositionStays: true);
             Track(run, fire, $"plume {i + 1}");
-            Line(run, "STEP", $"plume {i + 1} at {(i - 1.5f) * spacing:0.0} m lateral offset from the operator's line");
+            Line(run, "STEP", $"plume {i + 1}: spawned world={Pos(fire.transform.position)} dist={Dist(fire.transform.position, p):0.0} m");
+
+            if (follow)
+            {
+                fire.SetParent(p, worldPositionStays: true);
+                Line(run, "STEP", $"plume {i + 1}: after SetParent world={Pos(fire.transform.position)} " +
+                                  $"local={Pos(fire.transform.localPosition)} dist={Dist(fire.transform.position, p):0.0} m");
+            }
         }
 
-        Line(run, "RESULT", $"4 plumes spaced {spacing:0.0} m, parented. Report: count visible, follow, look, fire spread.");
+        Line(run, "RESULT", $"4 plumes, mode={mode}, spacing {spacing:0.0} m, centre 5 m in front. Report: how many you see, where they sit relative to you, follow or fixed, look.");
     }
+
+    // ── R6c: component audit of the siren prefab and a live entity ───────────────────────────────
+    // The siren has no AudioSource in its hierarchy (R6b) but it is audible, so the sound comes from another
+    // component. This lists every component type and reflects simple members of anything sound-related.
+    private void ProbeR6c(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 180f;
+        var path = run.Args.Length > 0 ? run.Args[0] : SirenPrefab;
+
+        var go = GameManager.server.FindPrefab(path);
+        if (go == null)
+        {
+            Line(run, "RESULT", $"FindPrefab null for '{path}'");
+            return;
+        }
+
+        AuditComponents(run, go, "prefab");
+
+        var entity = GameManager.server.CreateEntity(path, InFront(p, 20f, 1f), Quaternion.identity);
+        if (entity == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null; live audit skipped");
+            return;
+        }
+
+        Track(run, entity, "siren audit entity");
+        entity.Spawn();
+        AuditComponents(run, entity.gameObject, "live");
+        Line(run, "RESULT", "audit complete; entity placed 20 m in front and removed on end. Compare the prefab and live lists in the log.");
+    }
+
+    private static bool IsSoundRelated(string typeName)
+    {
+        var n = typeName.ToLowerInvariant();
+        return n.Contains("sound") || n.Contains("audio") || n.Contains("play") || n.Contains("effect") ||
+               n.Contains("loop") || n.Contains("siren") || n.Contains("clip") || n.Contains("music");
+    }
+
+    private static bool IsSimple(Type t) => t.IsPrimitive || t == typeof(string) || t.IsEnum;
+
+    private void AuditComponents(ProbeRun run, GameObject root, string label)
+    {
+        var comps = root.GetComponentsInChildren<Component>(true);
+        Line(run, "AUDIT", $"{label}: {comps.Length} component(s) in hierarchy of '{root.name}'");
+
+        foreach (var c in comps)
+        {
+            if (c == null)
+            {
+                Line(run, "AUDIT", "  <null/missing component>");
+                continue;
+            }
+
+            var type = c.GetType();
+            Line(run, "AUDIT", $"  [{c.gameObject.name}] {type.FullName}");
+            if (!IsSoundRelated(type.Name)) continue;
+
+            const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
+            foreach (var f in type.GetFields(flags))
+            {
+                if (!IsSimple(f.FieldType)) continue;
+                try { Line(run, "AUDIT", $"      field {f.Name} = {Convert.ToString(f.GetValue(c))}"); }
+                catch (Exception ex) { Line(run, "AUDIT", $"      field {f.Name} threw {ex.GetType().Name}"); }
+            }
+
+            foreach (var pr in type.GetProperties(flags))
+            {
+                if (pr.GetIndexParameters().Length > 0 || !IsSimple(pr.PropertyType)) continue;
+                try { Line(run, "AUDIT", $"      prop {pr.Name} = {Convert.ToString(pr.GetValue(c, null))}"); }
+                catch (Exception ex) { Line(run, "AUDIT", $"      prop {pr.Name} threw {ex.GetType().Name}"); }
+            }
+        }
+    }
+
+    private static string Pos(Vector3 v) => $"({v.x:0.00}, {v.y:0.00}, {v.z:0.00})";
+
+    private static float Dist(Vector3 v, BasePlayer p) => Vector3.Distance(v, p.transform.position);
 
     // ── value types ──────────────────────────────────────────────────────────────────────────────
     private sealed class ProbeRun
@@ -746,7 +844,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             {
                 __instance.SetFlag(BaseEntity.Flags.On, true);
                 __instance.SendNetworkUpdateImmediate();
-                __instance.Invoke(__instance.FinishUp, 210f);
+                __instance.Invoke(__instance.FinishUp, _r5SmokeSeconds);
                 _instance?.OnR5Intercept(__instance);
             }
             catch (Exception ex)

@@ -349,7 +349,8 @@ filled in; the rest are marked `ASSET-TBD`.
     "BoosterNozzleCount": 4,
     "WaterExitEffect": "assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab",
     "SeparationEffect": "ASSET-TBD",
-    "TargetSmokeEffect": "ASSET-TBD"
+    "TargetSmokeEffect": "ASSET-TBD",
+    "SmokeSeconds": 15
   },
   "Marker": {
     "Enabled": true,
@@ -466,6 +467,7 @@ compiled).
 | Bus prefab spawnable | `nuclear_warhead.prefab` spawns as a plain `BaseEntity` (`Spawn()` OK). Visible geometry unconfirmed — no renderer on the root. | ✅ spawns; ⚠️ visuals (R8) |
 | CCTV on a moving parent | `CCTV_RC` exists (`cctv.static`, `cctv_deployed`); parenting to a moving entity and keeping the feed alive is **unverified**. | ⚠️ probe R2 |
 | CCTV discovery | A station only auto-gathers **static** cameras within `autoGatherRadius`; anything else must be added by identifier (`ForceAddBookmark`). Confirmed in `ComputerStation.GatherStaticCameras`. | ✅ verified |
+| Siren as entity | Operator heard it. Spawn at (-2039.04, 9.75, 870.24); last audible at (-1448.57, 187.36, -1115.75) ≈ **2080 m**. No `AudioSource` in the hierarchy, so the sound comes from another component (R6c). Latecomer and walk-in behaviour not yet tested. | ✅ audible at ~2 km; ⚠️ mechanism (R6c) and latecomer test (R6d) pending |
 | Siren via effect route | With the correct path there is **no** pool error, but the siren was **not audible at 1 m or 2000 m** (R4 run 2). The effect route does not produce audible sound for this asset. | ❌ R6 effect route rejected; R6b entity route is the test |
 | Vanilla MLRS map marker is private | `MapMarkerMLRSRocket.ShouldNetworkTo` returns `player.userID == OwnerID` and `limitNetworking = true`: the marker is visible **only to the rocket's owner**, never to the server. Six vanilla markers cannot be shown to everyone. | ✅ verified — changes FR-29/FR-44 |
 | Generic map marker | `genericradiusmarker.prefab` = `MapMarkerGenericRadius` with public `radius`, `color1`, `color2`, `alpha` and `SendUpdate()`; no `ShouldNetworkTo` override, so it is not owner-limited. | ✅ verified (visibility still needs R7) |
@@ -474,8 +476,8 @@ compiled).
 | Clearing debug drawing | `ddraw.clear` clears the lines correctly on the operator's client (run 2). | ✅ verified |
 | Supply signal smoke | `SupplySignal.Explode` sets `Flags.On` and sends a network update; `smokeEffectPrefab` is referenced but not used in this file. Run 2's probe **killed** the signal, which removed the smoke. The R5 prefix must replicate the flag and network update without the plane. | ⚠️ R5 v2 |
 | Cargo plane suppression | Run 2: intercept fired; no plane seen after several minutes. | ✅ verified (plane); smoke pending |
-| CCTV identifier | `CCTV_RC` inherits from `PoweredRemoteControlEntity`; its identifier source is not in the decompile. Run 2: our camera reported `COBALT1`, and a station with that identifier opened a **large oil-rig camera**. Identifiers are probably not unique. | ❌ R2 v2 (duplicate survey) |
-| Marker radius units | `genericradiusmarker` at `radius = 60` tinted the **whole map** pink (run 2). Radius is not metres on the client. | ❌ R7 sweep |
+| CCTV identifier | `rcIdentifier` is a public field. `PoweredRemoteControlEntity.Spawn()` replaces a `#ID` token with the net id when the entity is static (verified source). Default `COBALT1` is shared by **32** monument cameras (run 4). Fix: `rcIdentifier = "NUKECAM#ID"` before `Spawn()`. `ComputerStation.IsValidIdentifier`: alphanumeric, ≤ 32 characters. | ✅ mechanism verified; ⚠️ run 5 to confirm |
+| Marker radius units | Run 2: radius 60 tinted the whole map. Run 4: radius 25 tinted the whole map; radius 5 was "fairly large". Radius is not metres on the client. | ❌ R7 sweep (0.5–5) in v0.4 |
 | FireBall plume neutering | Setting `spreadSubEntity = null` causes a `NullReferenceException` in `FireBall.TryToSpread` (run 2). Setting `generation = 1000` short-circuits the spread test instead. | ✅ fix in v0.3, to verify |
 | Bus visible | `nuclear_warhead.prefab` renders (run 2). | ✅ verified |
 | Vanilla MLRS map marker is private |
