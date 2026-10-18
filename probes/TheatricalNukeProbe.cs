@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.1.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.2.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.1")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.2")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.1";
+    private const string Version = "0.11.2";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -527,8 +527,8 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         var duration = (DateTime.UtcNow - run.StartUtc).TotalSeconds;
         var observed = run.Observed ? "yes" : "NO";
-        Banner(run, "END", $"outcome={run.Outcome}; cleanup={run.CleanupStatus}; duration={duration:0.0}s; observation={observed}; results={run.Results.Count}");
-        _sessionSummary.Add($"{run.Id} outcome={run.Outcome} cleanup={run.CleanupStatus} duration={duration:0.0}s observation={observed}");
+        Banner(run, "END", $"outcome={run.Outcome}; cleanup={run.CleanupStatus}; duration={duration:0.0}s; observation={observed}; results={run.Results.Count}; errors={run.ErrorCount}");
+        _sessionSummary.Add($"{run.Id} outcome={run.Outcome} cleanup={run.CleanupStatus} duration={duration:0.0}s observation={observed} errors={run.ErrorCount}");
     }
 
     private string RunCleanup(ProbeRun run)
@@ -897,8 +897,20 @@ public class TheatricalNukeProbe : CarbonPlugin
             Puts("[PROBE ERROR] " + text);
             Append(Path.Combine(LogDirectory, "probe-errors.log"), text);
 
+            if (run != null) run.ErrorCount++;
             var target = run?.LogPath ?? _session?.Path;
-            if (target != null) Append(target, $"ERROR    {where}: {ex.GetType().Name}: {ex.Message}\n{ex}");
+            if (target != null)
+            {
+                // Every line carries the probe tag, so the error reads as part of that probe in the session file.
+                var tag = run != null ? $"[PROBE {run.Id}]" : "[SESSION]";
+                var stamp = DateTime.UtcNow.ToString("HH:mm:ss.fff");
+                Append(target, $"[{stamp}] {tag} ERROR    {where}: {ex.GetType().Name}: {ex.Message}");
+                foreach (var frame in (ex.ToString() ?? string.Empty).Split('\n'))
+                {
+                    if (frame.Trim().Length == 0) continue;
+                    Append(target, $"[{stamp}] {tag} ERROR      {frame.TrimEnd()}");
+                }
+            }
         }
         catch
         {
@@ -1613,6 +1625,15 @@ public class TheatricalNukeProbe : CarbonPlugin
     private void ProbeR1m(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 60f;
+        // Run 7 (v0.11.1): Kill() on the injected entity threw NullReferenceException inside the game's
+        // LookupPrefab, because AddComponent does not assign a prefab ID. The entity may remain on the server.
+        // Gated behind "go" until the injection route is understood.
+        if (!(run.Args.Length > 0 && run.Args[0].Equals("go", StringComparison.OrdinalIgnoreCase)))
+        {
+            Line(run, "RESULT", "Not run. Run 7 showed the injected entity cannot be killed (NullReferenceException in LookupPrefab) and may stay on the server. Run again with 'go': /probe R1m go");
+            return;
+        }
+
         var prefab = GameManager.server.FindPrefab(MissilePrefab);
         if (prefab == null)
         {
@@ -1659,7 +1680,8 @@ public class TheatricalNukeProbe : CarbonPlugin
             try
             {
                 entity.Spawn();
-                Track(run, entity, "injected silo missile entity");
+                // Deliberately not tracked: killing it threw in run 7. The server entity is left for a restart.
+                Line(run, "NOTE", $"injected entity net id {(entity.net != null ? entity.net.ID : 0u)} is NOT killed by cleanup; expect it on the server until restart");
                 Line(run, "STEP", $"Spawn() returned; IsDestroyed={entity.IsDestroyed} net={(entity.net != null ? entity.net.ID : 0u)}");
                 Line(run, "RESULT", "Injected entity spawned. Operator: look 14 m in front at about 1 m. Report whether the silo missile body is visible.");
             }
@@ -1737,7 +1759,8 @@ public class TheatricalNukeProbe : CarbonPlugin
         }
 
         var netId = type.GetProperty("NetID")?.GetValue(entity);
-        Line(run, "STEP", $"created ClientEntity netId={netId}");
+        var prefabId = type.GetProperty("Prefab")?.GetValue(entity);
+        Line(run, "STEP", $"created ClientEntity netId={netId} prefabId={prefabId} (0 means the client gets no prefab)");
 
         var spawnAll = type.GetMethod("SpawnAll", BindingFlags.Public | BindingFlags.Instance);
         var killAll = type.GetMethod("KillAll", BindingFlags.Public | BindingFlags.Instance);
@@ -2466,6 +2489,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         public bool Observed;
         public bool Completed;
         public int TickCount;
+        public int ErrorCount;
         public readonly List<Tuple<string, BaseEntity>> Tracked = new List<Tuple<string, BaseEntity>>();
     }
 
