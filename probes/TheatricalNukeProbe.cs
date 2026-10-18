@@ -2148,7 +2148,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         foreach (var col in t.GetComponentsInChildren<Collider>(true))
             Line(run, "DETAIL", $"{label}: {col.GetType().Name} '{col.name}' enabled={col.enabled} isTrigger={col.isTrigger}");
         foreach (var n in t.GetComponentsInChildren<BaseNetworkable>(true))
-            Line(run, "DETAIL", $"{label}: networked component {n.GetType().Name} on '{n.name}' prefabID={n.prefabID}");
+            Line(run, "DETAIL", $"{label}: networked component {n.GetType().Name} on '{n.name}' prefabID={R1PrefabIdField()?.GetValue(n)}");
         foreach (var a in t.GetComponentsInChildren<Animator>(true))
             Line(run, "DETAIL", $"{label}: Animator on '{a.name}' enabled={a.enabled}");
         foreach (var ps in t.GetComponentsInChildren<ParticleSystem>(true))
