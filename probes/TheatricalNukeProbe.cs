@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.7.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.8.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.7")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.8")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.7";
+    private const string Version = "0.11.8";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -231,6 +231,18 @@ public class TheatricalNukeProbe : CarbonPlugin
                 return;
             }
 
+            if (first.Equals("more", StringComparison.OrdinalIgnoreCase))
+            {
+                // Appends to the last collected observation, for text the box cut off. Logged in full as OBSERVE-MORE.
+                var more = string.Join(" ", args.Skip(1));
+                if (IsBlank(more)) { player.ChatMessage("Usage: /probe more <rest of the observation>"); return; }
+                if (_lastCollectedRun == null) { player.ChatMessage("No observation has been collected yet. Use /probe obs <text> for the first part."); return; }
+                Line(_lastCollectedRun, "OBSERVE-MORE", EscapeText(more));
+                SessionLine("COLLECT", $"{_lastCollectedRun.Id} more text appended: characters={more.Length} text=\"{EscapeText(more)}\"");
+                player.ChatMessage($"Appended {more.Length} characters to {_lastCollectedRun.Id}.");
+                return;
+            }
+
             if (first.Equals("abort", StringComparison.OrdinalIgnoreCase))
             {
                 if (_active == null) player.ChatMessage("No probe running.");
@@ -307,7 +319,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
-        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)   R1r prefab id before Spawn, no Harmony   R1s wider Harmony write-path interception   R1t silo prefab via CreateEntity");
+        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)   R1r prefab id before Spawn, no Harmony   R1s wider Harmony write-path interception   R1t silo prefab via CreateEntity   BOXTEST observation box capture test");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -475,6 +487,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1r": ProbeR1r(run, op); break;
                 case "R1s": ProbeR1s(run, op); break;
                 case "R1t": ProbeR1t(run, op); break;
+                case "BOXTEST": ProbeBoxTest(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -1922,6 +1935,17 @@ public class TheatricalNukeProbe : CarbonPlugin
         e.Spawn();
         Track(run, e, "r1t silo prefab entity");
         Line(run, "RESULT", "Operator: look 8 m in front at about 2 m. Report what appears, its height and shape, and whether it looks like the upright silo missile.");
+    }
+
+    // ── BOXTEST: observation box capture test (no game action, no cleanup) ───────────────────────
+    // The operator types or pastes a numbered string into the box. The session log then shows exactly
+    // where any cut happens, and the length of the text that reached the probe.
+    private void ProbeBoxTest(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        var test = string.Join(" ", Enumerable.Range(1, 40).Select(i => i.ToString("D4")));
+        Line(run, "STEP", $"test string: 0001 to 0040, {test.Length} characters");
+        Line(run, "RESULT", "Operator: type 0001 0002 ... 0040 into the observation box (or paste it), then Submit. The log will show where any cut happens. Expected length: " + test.Length + " characters.");
     }
 
     // R1k: every networked entity prefab (manifest.entities), scanned for a child whose name looks like a missile.
