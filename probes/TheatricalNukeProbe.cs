@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.2.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.3.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -17,7 +17,7 @@
 //   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
 //   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.2")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.3")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.2";
+    private const string Version = "0.11.3";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -269,11 +269,11 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
-        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
-        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)");
+        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -436,6 +436,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1e": ProbeR1e(run, op); break;
                 case "R1g": ProbeR1g(run, op); break;
                 case "R1n": ProbeR1n(run, op); break;
+                case "R1p": ProbeR1p(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -1569,6 +1570,43 @@ public class TheatricalNukeProbe : CarbonPlugin
         Line(run, "RESULT", transforms.Length <= 1
             ? "Server copy is a stub: root only. The client prefab's visual children are unknown to the server."
             : $"Server copy has {transforms.Length - 1} child transform(s). Read the DETAIL lines for the body mesh.");
+    }
+
+    // R1p: Harmony discovery for the network write path. Read-only, installs no patch.
+    // Question: which server-side methods build the outgoing entity record (prefab id, position, snapshot)?
+    // Output tells us what a Harmony patch could change. Server-side patches cannot change the client's prefab.
+    private void ProbeR1p(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 30f;
+        Line(run, "STEP", $"Harmony instance present: {(_harmony != null ? "yes" : "no")}");
+
+        var pool = FindType("StringPool");
+        var get = pool?.GetMethod("Get", new[] { typeof(string) });
+        if (get != null)
+        {
+            var id = get.Invoke(null, new object[] { MissilePrefab });
+            Line(run, "STEP", $"StringPool id for '{MissilePrefab}' = {id}");
+        }
+        else
+        {
+            Line(run, "STEP", "StringPool.Get(string) not found by reflection.");
+        }
+
+        var flags = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+        var keys = new[] { "Save", "Spawn", "Snapshot", "Prefab", "Write", "Network", "Send", "Position", "Create", "Load" };
+        foreach (var t in new[] { typeof(BaseNetworkable), typeof(BaseEntity) })
+        {
+            foreach (var f in t.GetFields(flags).Where(f => f.Name.IndexOf("refab", StringComparison.OrdinalIgnoreCase) >= 0))
+                Line(run, "DETAIL", $"{t.Name} field {f.FieldType.Name} {f.Name}");
+
+            foreach (var m in t.GetMethods(flags).Where(m => !m.IsSpecialName && keys.Any(k => m.Name.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0)))
+            {
+                var args = string.Join(", ", m.GetParameters().Select(a => a.ParameterType.Name + " " + a.Name));
+                Line(run, "DETAIL", $"{t.Name}.{m.Name}({args}) -> {m.ReturnType.Name}");
+            }
+        }
+
+        Line(run, "RESULT", "Discovery only. No patch installed. Send the DETAIL lines for BaseNetworkable and BaseEntity so the Harmony target can be chosen.");
     }
 
     // R1k: every networked entity prefab (manifest.entities), scanned for a child whose name looks like a missile.
