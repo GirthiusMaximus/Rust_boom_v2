@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.1.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.1")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.0";
+    private const string Version = "0.11.1";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -1841,8 +1841,16 @@ public class TheatricalNukeProbe : CarbonPlugin
     private void ProbeR1o(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 40f;
-        var server = Effect.server;
-        var overloads = server.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Where(m => m.Name == "Run").ToList();
+        // Effect.server is a nested static type, not a value. It cannot be assigned to a variable, so reflect on the type.
+        var serverType = typeof(Effect).GetNestedType("server", BindingFlags.Public | BindingFlags.NonPublic);
+        if (serverType == null)
+        {
+            Line(run, "RESULT", "Effect has no nested type 'server' in this build. Route closed.");
+            return;
+        }
+
+        Line(run, "STEP", $"Effect.server resolved to nested type {serverType.FullName}");
+        var overloads = serverType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance).Where(m => m.Name == "Run").ToList();
         foreach (var m in overloads) Line(run, "DEBUG", $"Effect.server overload {Sig(m)}");
 
         var target = overloads.FirstOrDefault(m =>
@@ -1886,7 +1894,8 @@ public class TheatricalNukeProbe : CarbonPlugin
         Line(run, "STEP", $"invoking {Sig(target)} with the silo missile path and the bus as parent");
         try
         {
-            target.Invoke(server, args);
+            // Static method: target is null.
+            target.Invoke(null, args);
             Line(run, "STEP", "Effect submitted with a parent");
         }
         catch (Exception ex)
