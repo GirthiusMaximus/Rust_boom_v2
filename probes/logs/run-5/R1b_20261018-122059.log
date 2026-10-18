@@ -1,0 +1,23 @@
+﻿########## PROBE R1b START ########## v0.5.0 args=[] operator=76561197972272401
+[12:20:59.629] [PROBE R1b] AUDIT    missile prefab: 1 transform(s) under 'nuclear_silo_missile'
+[12:20:59.629] [PROBE R1b] AUDIT      'nuclear_silo_missile' active=False [Transform, MeshCollider]
+[12:20:59.630] [PROBE R1b] AUDIT    nuclear_warhead entity prefab: 2 transform(s) under 'nuclear_warhead'
+[12:20:59.630] [PROBE R1b] AUDIT      'nuclear_warhead' active=False [Transform, BaseEntity]
+[12:20:59.630] [PROBE R1b] AUDIT      'nuclear_warhead' active=False [Transform, MeshCollider]
+[12:20:59.630] [PROBE R1b] STEP     carrier BaseEntity spawned at (-2042.69, 114.63, 884.89) (net id 7968711)
+[12:20:59.630] [PROBE R1b] AUDIT    carrier live: 9 component(s) in hierarchy of 'assets/content/structures/rocket_crane/rocket_crane_lift_trigger.prefab'
+[12:20:59.631] [PROBE R1b] AUDIT      [assets/content/structures/rocket_crane/rocket_crane_lift_trigger.prefab] UnityEngine.Transform
+[12:20:59.631] [PROBE R1b] AUDIT      [assets/content/structures/rocket_crane/rocket_crane_lift_trigger.prefab] BaseEntity
+[12:20:59.631] [PROBE R1b] AUDIT      [assets/content/structures/rocket_crane/rocket_crane_lift_trigger.prefab] EntityFlag_Toggle
+[12:20:59.631] [PROBE R1b] AUDIT      [triggerHurt] UnityEngine.Transform
+[12:20:59.631] [PROBE R1b] AUDIT      [triggerHurt] UnityEngine.BoxCollider
+[12:20:59.631] [PROBE R1b] AUDIT      [triggerHurt] TriggerHurt
+[12:20:59.631] [PROBE R1b] AUDIT      [triggerParent] UnityEngine.Transform
+[12:20:59.631] [PROBE R1b] AUDIT      [triggerParent] UnityEngine.BoxCollider
+[12:20:59.631] [PROBE R1b] AUDIT      [triggerParent] TriggerParent
+[12:20:59.631] [PROBE R1b] STEP     server-side missile copy created under the carrier 'assets/content/structures/rocket_crane/rocket_crane_lift_trigger.prefab'
+[12:20:59.632] [PROBE R1b] RESULT   Operator: stand 30 m away, look 14 m in front of you at about 1 m height. Report whether you see the missile body. Expected: NO. Then /probe R1b end <observation>.
+[12:21:29.607] [PROBE R1b] OBSERVE  Nothing seen still
+[12:21:29.607] [PROBE R1b] CLEANUP  OK   destroy server-side missile copy: destroyed
+[12:21:29.607] [PROBE R1b] CLEANUP  OK   kill carrier entity: killed; IsDestroyed=True
+########## PROBE R1b END ########## outcome=ended by operator; cleanup=OK; duration=30.0s

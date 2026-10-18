@@ -1,0 +1,18 @@
+﻿########## PROBE R9 START ########## v0.5.0 args=[2 | follow] operator=76561197972272401
+[12:38:46.380] [PROBE R9] STEP     mode=follow (parent after spawn) spacing=2.0 m centre=(-2069.34, 14.24, 836.02)
+[12:38:46.380] [PROBE R9] STEP     operator at (-2069.34, 13.24, 831.02)
+[12:38:46.380] [PROBE R9] STEP     plume 1: spawned world=(-2072.34, 14.24, 836.02) dist=5.9 m
+[12:38:46.380] [PROBE R9] STEP     plume 1: after SetParent world=(-2069.34, 13.24, 831.02) local=(0.00, 0.00, 0.00) dist=0.0 m
+[12:38:46.381] [PROBE R9] STEP     plume 2: spawned world=(-2070.34, 14.24, 836.02) dist=5.2 m
+[12:38:46.381] [PROBE R9] STEP     plume 2: after SetParent world=(-2069.34, 13.24, 831.02) local=(0.00, 0.00, 0.00) dist=0.0 m
+[12:38:46.381] [PROBE R9] STEP     plume 3: spawned world=(-2068.34, 14.24, 836.02) dist=5.2 m
+[12:38:46.381] [PROBE R9] STEP     plume 3: after SetParent world=(-2069.34, 13.24, 831.02) local=(0.00, 0.00, 0.00) dist=0.0 m
+[12:38:46.382] [PROBE R9] STEP     plume 4: spawned world=(-2066.34, 14.24, 836.02) dist=5.9 m
+[12:38:46.382] [PROBE R9] STEP     plume 4: after SetParent world=(-2069.34, 13.24, 831.02) local=(0.00, 0.00, 0.00) dist=0.0 m
+[12:38:46.382] [PROBE R9] RESULT   4 plumes, mode=follow, spacing 2.0 m, centre 5 m in front. Report: how many you see, where they sit relative to you, follow or fixed, look.
+[12:39:27.335] [PROBE R9] OBSERVE  2 spawn in front, but immedietely both moved ontop of player becoming merged.
+[12:39:27.335] [PROBE R9] CLEANUP  OK   kill plume 4: killed; IsDestroyed=True
+[12:39:27.341] [PROBE R9] CLEANUP  OK   kill plume 3: killed; IsDestroyed=True
+[12:39:27.341] [PROBE R9] CLEANUP  OK   kill plume 2: killed; IsDestroyed=True
+[12:39:27.341] [PROBE R9] CLEANUP  OK   kill plume 1: killed; IsDestroyed=True
+########## PROBE R9 END ########## outcome=ended by operator; cleanup=OK; duration=41.0s

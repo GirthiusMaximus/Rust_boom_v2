@@ -1,0 +1,9 @@
+﻿########## PROBE R2 START ########## v0.5.0 args=[] operator=76561197972272401
+[12:22:08.614] [PROBE R2] STEP     survey: 98 CCTV_RC, 67 distinct identifiers; duplicated: COBALT1 x32
+[12:22:08.614] [PROBE R2] STEP     prefab identifier before spawn='COBALT1'; setting template 'NUKECAM#ID'
+[12:22:08.615] [PROBE R2] RESULT   own identifier=NUKECAM7969184; valid=True; occurrences including this camera=1
+[12:22:08.615] [PROBE R2] STEP     parented to operator (worldPositionStays: true)
+[12:22:08.615] [PROBE R2] STEP     NEXT: at a computer station add 'NUKECAM7969184' as a bookmark. Walk, jump, turn. Report the feed and which camera it shows.
+[12:23:39.790] [PROBE R2] OBSERVE  Correct camera feed is now shown, consider shorter bookmark name.
+[12:23:39.791] [PROBE R2] CLEANUP  OK   kill cctv: killed; IsDestroyed=True
+########## PROBE R2 END ########## outcome=ended by operator; cleanup=OK; duration=91.4s

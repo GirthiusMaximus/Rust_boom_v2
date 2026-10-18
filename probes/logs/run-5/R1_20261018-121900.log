@@ -1,0 +1,7 @@
+﻿########## PROBE R1 START ########## v0.5.0 args=[] operator=76561197972272401
+[12:19:00.160] [PROBE R1] STEP     FindPrefab OK: nuclear_silo_missile
+[12:19:00.161] [PROBE R1] STEP     root components: Transform, MeshCollider
+[12:19:00.161] [PROBE R1] STEP     BaseEntity on root: False
+[12:19:00.162] [PROBE R1] RESULT   CreateEntity returned null: missile prefab is not spawnable as an entity (matches run 1)
+[12:19:29.452] [PROBE R1] OBSERVE  nothing
+########## PROBE R1 END ########## outcome=ended by operator; cleanup=OK; duration=29.3s

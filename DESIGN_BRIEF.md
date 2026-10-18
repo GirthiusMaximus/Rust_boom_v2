@@ -2,7 +2,7 @@
 
 > **Product:** Theatrical Nuke
 > **Artifact:** Carbon plugin (`.cs`, server-side only)
-> **Status:** **Draft v0.2 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
+> **Status:** **Draft v0.3 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
 > Storyboard is intentionally incomplete past the terminal phase.
 > **Last updated:** 2026-10-17
 >
@@ -691,6 +691,7 @@ amended if reality disagreed.
 |---|---|---|---|
 | 0.1 | 2026-10-17 | Initial framework: storyboard, FRs, config sketch, feasibility probes, open questions. | Build agent |
 | 0.2 | 2026-10-17 | Probe run 2: siren path corrected (`air raid`); R3, R8, R5 plane confirmed; R2 identifier duplicates; R7 marker tinted the whole map; R9 plumes need the `generation` neutering. Operator answers recorded (Q1–Q12). Probe run 1: missile not an entity (R1), siren not playable via effects (R6), bus spawns (R8), supply intercept works (R5). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
+| 0.3 | 2026-10-18 | Probe run 5 (v0.5.0 logs): R1b carrier test: a bare networked carrier spawns, and a server-side missile copy under it is not reported as visible (operator saw nothing; M0 Part E); R2 NUKECAM identifier works and the feed shows our camera; R5 confirmed: smoke 15 s, no cargo plane; R9 static plumes correct, follow mode merged onto the operator (fixed in v0.6.0, untested); R7 0.5 m is about one grid cell. Map size recorded as 6000 (unit to confirm). Probe protocol v0.6: one session log, observation box on `/probe <ID> end`. | Build agent |
 
 ---
 

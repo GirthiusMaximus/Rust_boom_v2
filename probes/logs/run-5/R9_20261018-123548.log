@@ -1,0 +1,14 @@
+﻿########## PROBE R9 START ########## v0.5.0 args=[static] operator=76561197972272401
+[12:35:48.846] [PROBE R9] STEP     mode=static (not parented) spacing=2.0 m centre=(-2069.66, 9.39, 844.09)
+[12:35:48.847] [PROBE R9] STEP     operator at (-2069.66, 8.39, 839.09)
+[12:35:48.847] [PROBE R9] STEP     plume 1: spawned world=(-2072.66, 9.39, 844.09) dist=5.9 m
+[12:35:48.847] [PROBE R9] STEP     plume 2: spawned world=(-2070.66, 9.39, 844.09) dist=5.2 m
+[12:35:48.848] [PROBE R9] STEP     plume 3: spawned world=(-2068.66, 9.39, 844.09) dist=5.2 m
+[12:35:48.848] [PROBE R9] STEP     plume 4: spawned world=(-2066.66, 9.39, 844.09) dist=5.9 m
+[12:35:48.848] [PROBE R9] RESULT   4 plumes, mode=static, spacing 2.0 m, centre 5 m in front. Report: how many you see, where they sit relative to you, follow or fixed, look.
+[12:37:18.233] [PROBE R9] OBSERVE  4 plumes spawned directly north of player, spaced evenly, static
+[12:37:18.233] [PROBE R9] CLEANUP  OK   kill plume 4: killed; IsDestroyed=True
+[12:37:18.233] [PROBE R9] CLEANUP  OK   kill plume 3: killed; IsDestroyed=True
+[12:37:18.233] [PROBE R9] CLEANUP  OK   kill plume 2: killed; IsDestroyed=True
+[12:37:18.233] [PROBE R9] CLEANUP  OK   kill plume 1: killed; IsDestroyed=True
+########## PROBE R9 END ########## outcome=ended by operator; cleanup=OK; duration=89.4s

@@ -1,0 +1,9 @@
+﻿########## PROBE R7 START ########## v0.5.0 args=[] operator=76561197972272401
+[12:31:42.285] [PROBE R7] STEP     marker spawned; radius=0.5 sent. Check your map now.
+[12:32:02.288] [PROBE R7] STEP     radius=1 sent. Report: circle size vs map grid cells, and whether the whole map is tinted.
+[12:32:22.286] [PROBE R7] STEP     radius=2 sent. Report: circle size vs map grid cells, and whether the whole map is tinted.
+[12:32:42.289] [PROBE R7] STEP     radius=3 sent. Report: circle size vs map grid cells, and whether the whole map is tinted.
+[12:33:02.290] [PROBE R7] STEP     radius=5 sent. Report: circle size vs map grid cells, and whether the whole map is tinted.
+[12:33:02.530] [PROBE R7] OBSERVE  Restarting
+[12:33:02.530] [PROBE R7] CLEANUP  OK   kill marker: killed; IsDestroyed=True
+########## PROBE R7 END ########## outcome=ended by operator; cleanup=OK; duration=80.2s

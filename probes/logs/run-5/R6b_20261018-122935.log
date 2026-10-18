@@ -1,0 +1,11 @@
+﻿########## PROBE R6b START ########## v0.5.0 args=[] operator=76561197972272401
+[12:29:35.792] [PROBE R6b] STEP     FindPrefab OK: airraidsound (path='assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab')
+[12:29:35.792] [PROBE R6b] AUDIO    prefab: 0 AudioSource component(s) on airraidsound (reflected)
+[12:29:35.793] [PROBE R6b] STEP     spawned BaseEntity at (-2061.43, 33.70, 833.35); net id=7980043
+[12:29:35.793] [PROBE R6b] AUDIO    live: 0 AudioSource component(s) on assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab (reflected)
+[12:29:35.793] [PROBE R6b] STEP     NEXT: listen at 1 m, then walk out to 200, 800, 1900 m and report where it stops. /probe R6b end <observation>
+[12:29:37.796] [PROBE R6b] AUDIO    +2 s: AudioSources currently playing = 0
+[12:29:45.800] [PROBE R6b] AUDIO    +10 s: AudioSources currently playing = 0
+[12:31:17.371] [PROBE R6b] OBSERVE  Audio heard, moved 2000+ m away and back in, audio still heard, further probe required for siren spawned further
+[12:31:17.371] [PROBE R6b] CLEANUP  OK   kill siren entity: killed; IsDestroyed=True
+########## PROBE R6b END ########## outcome=ended by operator; cleanup=OK; duration=101.6s

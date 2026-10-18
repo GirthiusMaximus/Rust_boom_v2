@@ -1,0 +1,11 @@
+﻿########## PROBE R6c START ########## v0.5.0 args=[] operator=76561197972272401
+[12:27:32.425] [PROBE R6c] AUDIT    prefab: 2 component(s) in hierarchy of 'airraidsound'
+[12:27:32.425] [PROBE R6c] AUDIT      [airraidsound] UnityEngine.Transform
+[12:27:32.425] [PROBE R6c] AUDIT      [airraidsound] BaseEntity
+[12:27:32.425] [PROBE R6c] AUDIT    live: 2 component(s) in hierarchy of 'assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab'
+[12:27:32.426] [PROBE R6c] AUDIT      [assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab] UnityEngine.Transform
+[12:27:32.426] [PROBE R6c] AUDIT      [assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab] BaseEntity
+[12:27:32.426] [PROBE R6c] RESULT   audit complete; entity placed 20 m in front and removed on end. Compare the prefab and live lists in the log.
+[12:29:13.300] [PROBE R6c] OBSERVE  Audio heard ingame
+[12:29:13.301] [PROBE R6c] CLEANUP  OK   kill siren audit entity: killed; IsDestroyed=True
+########## PROBE R6c END ########## outcome=ended by operator; cleanup=OK; duration=100.9s

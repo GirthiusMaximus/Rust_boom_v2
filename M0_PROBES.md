@@ -462,3 +462,39 @@ If R1b confirms invisibility, the options are:
 - **A.** Use a networked entity whose prefab already shows a missile-like model (audit result decides).
 - **B.** Use a visible vanilla rocket entity (`rocket_basic`, `rocket_hv`, `rocket_fire`) as the body. Not MLRS, but still a generic rocket, so the theatre is weaker.
 - **C.** Ship a client content bundle with the missile. Rejected by the server-only rule (no client mods). Needs an explicit decision to relax it.
+
+
+### Run 5 — 2026-10-18 (operator logs: probes v0.5.0, attached as TheatricalNukeProbe2.zip)
+
+Logs are in `/home/user/probe_logs_run5/` (copy to `probes/logs/run-5/` on commit).
+
+| Probe | Result | Verdict |
+|---|---|---|
+| R1 | Missile root = Transform + MeshCollider, no BaseEntity; CreateEntity null. | Confirmed (run 1). |
+| R1b ×2 | Carrier `rocket_crane_lift_trigger` spawned (net ids 7968251, 7968711). Server-side missile copy under it. Operator saw **nothing**. Cleanup OK. | **Invisible as expected.** Carrier idea needs option A, B or C (below). |
+| R1b audit | Missile prefab: one Transform, one MeshCollider, no MeshFilter or renderer. `nuclear_warhead`: root BaseEntity; child MeshCollider. Server prefabs do not expose visual meshes. | Audit cannot show the warhead shape. Check in game. |
+| R2 | 98 CCTV on server; prefab identifier COBALT1. Our camera got `NUKECAM7969184`, valid. Feed shows the correct camera. Operator: "consider shorter bookmark name". | **Confirmed.** Name length question open (Q-B). |
+| R5 | Intercept at (-2048.71, 5.11, 871.15). Smoke 15 s. No cargo plane. | **Confirmed.** |
+| R6b | Siren entity spawned; operator heard it. Moved 2000+ m out and back. Log wording unclear on whether audio stopped at range. | Partly answered. Falloff still open (Q-C). |
+| R6c | Audit: prefab and live both Transform + BaseEntity only. Operator heard audio at 20 m. | Confirmed: sound comes from a component the server cannot see. |
+| R7 ×2 | Run 1 ended by a server restart ("Restarting"). Run 2: radius 0.5 is about one grid cell. | Sizes not tuned yet. Second-player test deferred (Q2). |
+| R9 static | 4 plumes spaced 2 m, 5 m north of operator, fixed. | **Confirmed.** |
+| R9 follow ×2 | After `SetParent`, local position was zeroed, so the plumes sat on the operator and merged. | **Bug.** v0.6.0 sets the local offset after parenting, then sends an update. Untested. |
+
+**Operator answers (2026-10-18):** Q1 map size 6000 (unit to confirm, see Part A). Q2 second-player test for R7 is deferred. Marker sizes need tuning.
+
+### Probe protocol v0.6 (applies to ALL future sessions)
+
+- **One session log per session.** `/probe start` opens `carbon/logs/TheatricalNukeProbe/session_<timestamp>.log`. Every probe in the session writes into this file. `/probe end` closes it and writes a summary. Probes refuse to run without an open session.
+- **Start and end banners per probe** are written into the session file, with the R number.
+- **`/probe <ID> end` with no words** runs cleanup, then opens an in-game observation box (CUI). Type the observation (limit 1000 words, about 6000 characters), then press Submit. The box text becomes the OBSERVE line. `/probe <ID> end <words>` still works for chat-only sessions.
+- **Verbose logging:** each probe writes an environment snapshot at start and end, a TICK line every 5 s (operator position and tracked entity state), DEBUG lines for each cleanup item, and full stack traces for errors.
+- Each probe still cleans up after itself, in reverse order of creation.
+
+### Open after run 5
+
+- **Q-A (map size unit).** "6000 square meters" was recorded as a 6000 m side length. Confirm: 6000 m × 6000 m, or a different unit?
+- **Q-B (bookmark name).** Current name is `NUKECAM` + network ID (14 characters). Shorter option: `NUKE` + ID. Which do you want?
+- **Q-C (siren falloff).** Did the siren stop being audible as you walked out, and at what distance? Please re-run R6b with a note of the distance.
+- **Q-D (missile body).** Choose option A, B or C (see the carrier section above), or ask for a further test.
+- **Q-E (R7 sizes).** Which radii should the sweep use next? Options: `/probe R7 0.1 0.25 0.5 1`. The probe now takes any radius list.
