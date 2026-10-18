@@ -656,3 +656,14 @@ The initial missile on ascent and boost **must use `assets/content/structures/nu
 **Known gap.** The server copy of the silo missile has no visual children (R1b, R1f: root and MeshCollider only). The client's visual children are unknown until a probe shows them. R1g and R1h are the only avenues that let the client build the full prefab.
 
 **Run 7 order:** R1i → R1j → R1k (all read-only) → R1g `go` → R1h `go` → R1m. Stop after each one and read the result before the next.
+
+#### Killable routes for the silo missile (probes v0.11.0, operator decision run 7)
+
+Operator: the effect-route tests (R1g, R1h) are acceptable only if the spawned entities can be killed after the test. Two killable routes are now in the probe.
+
+- **R1n. Carbon `ClientEntity`.** Source: Carbon.Common `src/Carbon/Components/ClientEntity.cs`, namespace `Carbon.Components`. This is a Carbon-native, client-only networked entity with a kill handle. The API is `Create(prefabName, position, rotation, proto, netId, group)`, `SpawnAll(IList<Connection>)`, `Position` plus `SendNetworkUpdate_Position()` for movement, `KillAll(mode)`, and `Dispose()`. Carbon's own docs describe it as a visual-only utility. The probe calls it by reflection, so the plugin compiles even if the type is not in the reference set. The route also tests movement: the body rises 40 m over 10 s, then is killed at 20 s. Open question: whether the client can build a prefab that is not a networked entity. The probe will show this. The string-pool lookup may also reject a non-entity path.
+- **R1o. Effect with an entity parent.** Forum report (Oxide, 2015): an effect attached to an entity is destroyed with that entity. The probe finds the 7-argument `Effect.server.Run` overload that takes a `BaseEntity` by reflection, logs every `Run` overload it finds, attaches the silo missile to a networked warhead bus, and kills the bus at 15 s. The forum report is not verified against our build.
+
+Not killable: R1g and R1h (plain `Effect.server.Run`, no handle). They remain available only with `go`. Superseded by R1n and R1o for any run that must clean up.
+
+**Run 7 order (revised):** R1i → R1j → R1k (read-only) → R1n (killable, moves) → R1o (killable) → R1g `go` and R1h `go` only if R1n and R1o both fail → R1m.

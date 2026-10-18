@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.10.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -17,7 +17,7 @@
 //   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
 //   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.10.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.10.0";
+    private const string Version = "0.11.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -269,11 +269,11 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
-        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
-        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection");
+        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -435,6 +435,8 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1c": ProbeR1c(run, op); break;
                 case "R1e": ProbeR1e(run, op); break;
                 case "R1g": ProbeR1g(run, op); break;
+                case "R1n": ProbeR1n(run, op); break;
+                case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
                 case "R1j": ProbeR1j(run, op); break;
@@ -1680,6 +1682,296 @@ public class TheatricalNukeProbe : CarbonPlugin
         Line(run, "RESULT", "Not run. This route leaves client objects with no server handle, so cleanup cannot remove them. " +
                             "Run it again with 'go': /probe " + run.Id + " go");
         return false;
+    }
+
+    // ── R1n: Carbon ClientEntity (client-only networked entity with a kill handle) ─────────────────
+    // Source: Carbon.Common src/Carbon/Components/ClientEntity.cs (namespace Carbon.Components).
+    // Create(prefabName, position, rotation, proto, netId, group) -> SpawnAll(IList<Connection>) -> Position +
+    // SendNetworkUpdate_Position to move -> KillAll(mode) to remove -> Dispose().
+    // Reached by reflection so the plugin compiles even if Carbon.Components is not in the reference set.
+    // Phases: spawn now; rise 40 m over 10 s (0.5 s steps); kill at 20 s. Cleanup kills and disposes if still alive.
+    private void ProbeR1n(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 40f;
+        var type = FindType("Carbon.Components.ClientEntity");
+        if (type == null)
+        {
+            Line(run, "RESULT", "Carbon.Components.ClientEntity not found in any loaded assembly. Route closed on this build.");
+            return;
+        }
+
+        Line(run, "STEP", $"type {type.FullName} in assembly {type.Assembly.GetName().Name}");
+        foreach (var m in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly))
+        {
+            Line(run, "DEBUG", $"member {Sig(m)}");
+        }
+
+        var create = type.GetMethod("Create", BindingFlags.Public | BindingFlags.Static);
+        if (create == null)
+        {
+            Line(run, "RESULT", "Create method not found by reflection. Route closed on this build.");
+            return;
+        }
+
+        var pos = InFront(p, 14f, 0f);
+        var args = BuildArgs(create, MissilePrefab, pos, Quaternion.identity);
+        Line(run, "STEP", $"ClientEntity.Create('{MissilePrefab}', {Pos(pos)}) with {args.Length} argument(s)");
+
+        object entity;
+        try
+        {
+            entity = create.Invoke(null, args);
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException ?? ex;
+            ErrorLog(run, "R1n Create", inner);
+            Line(run, "RESULT", $"Create threw {inner.GetType().Name}: {inner.Message}");
+            return;
+        }
+
+        if (entity == null)
+        {
+            Line(run, "RESULT", "Create returned null. Carbon logs a warning when the prefab is not in its string pool. Check the console for 'ClientEntity creation failed'.");
+            return;
+        }
+
+        var netId = type.GetProperty("NetID")?.GetValue(entity);
+        Line(run, "STEP", $"created ClientEntity netId={netId}");
+
+        var spawnAll = type.GetMethod("SpawnAll", BindingFlags.Public | BindingFlags.Instance);
+        var killAll = type.GetMethod("KillAll", BindingFlags.Public | BindingFlags.Instance);
+        var dispose = type.GetMethod("Dispose", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+        var setPos = type.GetProperty("Position");
+        var sendPos = type.GetMethod("SendNetworkUpdate_Position", BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
+
+        if (spawnAll == null)
+        {
+            Line(run, "RESULT", "SpawnAll not found by reflection. Created entity is left for cleanup.");
+        }
+        else
+        {
+            try
+            {
+                var list = BuildConnectionList(spawnAll, p);
+                spawnAll.Invoke(entity, new object[] { list });
+                Line(run, "STEP", "SpawnAll sent to the operator's connection");
+            }
+            catch (Exception ex)
+            {
+                var inner = ex.InnerException ?? ex;
+                ErrorLog(run, "R1n SpawnAll", inner);
+                Line(run, "STEP", $"SpawnAll threw {inner.GetType().Name}: {inner.Message}");
+            }
+        }
+
+        run.Cleanup.Add(new CleanupItem
+        {
+            Label = "R1n ClientEntity KillAll + Dispose",
+            Run = () =>
+            {
+                var notes = new List<string>();
+                if (killAll != null)
+                {
+                    killAll.Invoke(entity, new object[] { DefaultArg(killAll.GetParameters(), 0) });
+                    notes.Add("KillAll");
+                }
+
+                if (dispose != null)
+                {
+                    dispose.Invoke(entity, null);
+                    notes.Add("Dispose");
+                }
+
+                return notes.Count == 0 ? "no kill or dispose method found" : string.Join("+", notes);
+            },
+        });
+
+        if (setPos != null && sendPos != null)
+        {
+            var baseline = pos;
+            for (var i = 1; i <= 20; i++)
+            {
+                var step = i;
+                timer.Once(step * 0.5f, () =>
+                {
+                    try
+                    {
+                        if (run.Ended) return;
+                        var next = baseline + Vector3.up * (step * 2f);
+                        setPos.SetValue(entity, next);
+                        sendPos.Invoke(entity, null);
+                        if (step % 4 == 0) Line(run, "STEP", $"R1n rise step {step}/20: Position={Pos(next)} (+{step * 2f:0} m)");
+                    }
+                    catch (Exception ex)
+                    {
+                        var inner = ex.InnerException ?? ex;
+                        ErrorLog(run, "R1n move", inner);
+                    }
+                });
+            }
+        }
+        else
+        {
+            Line(run, "NOTE", "Position setter or SendNetworkUpdate_Position not found; no movement phase.");
+        }
+
+        timer.Once(20f, () =>
+        {
+            try
+            {
+                if (run.Ended) return;
+                Line(run, "STEP", "R1n kill phase at 20 s: KillAll (the operator should see the body disappear).");
+                if (killAll != null) killAll.Invoke(entity, new object[] { DefaultArg(killAll.GetParameters(), 0) });
+                Line(run, "RESULT", "Kill sent. Operator: report whether the silo missile appeared, moved up with the steps, and disappeared at about 20 s. Report what it looked like.");
+            }
+            catch (Exception ex)
+            {
+                var inner = ex.InnerException ?? ex;
+                ErrorLog(run, "R1n kill", inner);
+            }
+        });
+
+        Line(run, "RESULT", "Operator: look 14 m in front at about 1 m. Expect the silo missile to appear, rise about 40 m over 10 s, and vanish at 20 s. Report each.");
+    }
+
+    // R1o: Effect.server.Run with a BaseEntity parent (the 7-argument overload reported on the Oxide forum).
+    // A networked warhead bus is spawned 14 m in front and the effect is attached to it. The bus is then killed at
+    // 15 s. If the effect vanishes with it, the effect has a kill route. Reflection finds the overload, so no compile risk.
+    private void ProbeR1o(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 40f;
+        var server = Effect.server;
+        var overloads = server.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Where(m => m.Name == "Run").ToList();
+        foreach (var m in overloads) Line(run, "DEBUG", $"Effect.server overload {Sig(m)}");
+
+        var target = overloads.FirstOrDefault(m =>
+        {
+            var ps = m.GetParameters();
+            return ps.Length >= 2 && ps[0].ParameterType == typeof(string) && ps[1].ParameterType == typeof(BaseEntity);
+        });
+
+        if (target == null)
+        {
+            Line(run, "RESULT", "No Effect.server.Run overload takes (string, BaseEntity, ...) in this build. Route closed.");
+            return;
+        }
+
+        var pos = InFront(p, 14f, 1f);
+        var bus = GameManager.server.CreateEntity(BusPrefab, pos, Quaternion.identity);
+        if (bus == null)
+        {
+            Line(run, "RESULT", $"CreateEntity returned null for {BusPrefab}. Probe not run.");
+            return;
+        }
+
+        bus.Spawn();
+        Track(run, bus, "parent bus");
+        Line(run, "STEP", $"parent bus spawned at {Pos(pos)} (net id {(bus.net != null ? bus.net.ID : 0u)})");
+
+        var ps2 = target.GetParameters();
+        var args = new object[ps2.Length];
+        for (var i = 0; i < ps2.Length; i++)
+        {
+            var t = ps2[i].ParameterType;
+            if (i == 0) args[i] = MissilePrefab;
+            else if (i == 1) args[i] = bus;
+            else if (t == typeof(Vector3)) args[i] = i == 2 ? Vector3.zero : Vector3.up;
+            else if (t == typeof(bool)) args[i] = true;
+            else if (t == typeof(uint)) args[i] = 0u;
+            else if (ps2[i].HasDefaultValue) args[i] = ps2[i].DefaultValue;
+            else args[i] = null;
+        }
+
+        Line(run, "STEP", $"invoking {Sig(target)} with the silo missile path and the bus as parent");
+        try
+        {
+            target.Invoke(server, args);
+            Line(run, "STEP", "Effect submitted with a parent");
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException ?? ex;
+            ErrorLog(run, "R1o invoke", inner);
+            Line(run, "RESULT", $"Invoke threw {inner.GetType().Name}: {inner.Message}");
+            return;
+        }
+
+        timer.Once(15f, () =>
+        {
+            try
+            {
+                if (run.Ended) return;
+                if (bus == null || bus.IsDestroyed)
+                {
+                    Line(run, "NOTE", "bus already gone before the kill step");
+                    return;
+                }
+
+                bus.Kill();
+                Line(run, "STEP", $"R1o kill at 15 s: parent bus killed; IsDestroyed={bus.IsDestroyed}");
+                Line(run, "RESULT", "Operator: did the silo missile vanish with the bus at 15 s? Report yes, no, or it stayed.");
+            }
+            catch (Exception ex)
+            {
+                ErrorLog(run, "R1o kill", ex);
+            }
+        });
+
+        Line(run, "RESULT", "Operator: look 14 m in front at about 1 m. The silo missile should appear, then vanish when the parent bus is killed at 15 s.");
+    }
+
+    private static Type FindType(string fullName)
+    {
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            try
+            {
+                var t = asm.GetType(fullName);
+                if (t != null) return t;
+            }
+            catch (Exception)
+            {
+                // Some dynamic assemblies throw on GetType. Skip them.
+            }
+        }
+
+        return null;
+    }
+
+    private static string Sig(MethodInfo m) =>
+        $"{m.ReturnType.Name} {m.Name}({string.Join(", ", m.GetParameters().Select(x => x.ParameterType.Name + " " + x.Name + (x.HasDefaultValue ? " = default" : string.Empty)))})";
+
+    // Fills a parameter list by position. The first three are supplied; the rest take their declared defaults.
+    private static object[] BuildArgs(MethodInfo m, string path, Vector3 pos, Quaternion rot)
+    {
+        var ps = m.GetParameters();
+        var args = new object[ps.Length];
+        for (var i = 0; i < ps.Length; i++)
+        {
+            if (i == 0) args[i] = path;
+            else if (i == 1) args[i] = pos;
+            else if (i == 2) args[i] = rot;
+            else args[i] = ps[i].HasDefaultValue ? ps[i].DefaultValue : null;
+        }
+
+        return args;
+    }
+
+    private static object DefaultArg(ParameterInfo[] ps, int index)
+    {
+        if (ps.Length <= index) return null;
+        return ps[index].HasDefaultValue ? ps[index].DefaultValue : Enum.ToObject(ps[index].ParameterType, 0);
+    }
+
+    // Builds an IList<Connection> (the element type comes from the SpawnAll parameter) with the operator's connection.
+    private static object BuildConnectionList(MethodInfo spawnAll, BasePlayer p)
+    {
+        var listType = spawnAll.GetParameters()[0].ParameterType;
+        var elem = listType.IsGenericType ? listType.GetGenericArguments()[0] : typeof(object);
+        var list = Activator.CreateInstance(typeof(List<>).MakeGenericType(elem));
+        list.GetType().GetMethod("Add").Invoke(list, new object[] { p.net.connection });
+        return list;
     }
 
     // ── R1f: in-world silo search, then a server-side silo copy under a different networked parent ─
