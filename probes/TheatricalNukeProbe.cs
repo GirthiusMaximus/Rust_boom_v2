@@ -1,31 +1,31 @@
-// TheatricalNukeProbe.cs — M0 probe harness for the Theatrical Nuke plugin.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.3.0.
 //
-// Source-verified against decompiled Assembly-CSharp (2026-10-17). NOT COMPILED here: there is no
-// .NET toolchain in the build environment. Treat it as a starting point, not a shipped artefact.
-// Test server only — the supply probe patches SupplySignal.Explode for every supply signal.
+// v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
+// calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
+// BaseEntity.Flags.On, SendNetworkUpdateImmediate, Invoke(Action,float) inside the R5
+// prefix, UnityEngine.Object.FindObjectsOfType, GetComponentsInChildren<AudioSource>.
+// If Carbon reports a compile error, those lines are the first suspects.
 //
-// Install: copy to carbon/plugins/TheatricalNukeProbe.cs, then `c.reload TheatricalNukeProbe`.
-// Commands (admin only, in chat):
-//   /probe spawn <prefab>       R8  — is this prefab an entity, and can it be spawned?
-//   /probe missile              R1  — the missile prefab specifically
-//   /probe bus                  R8b — the nuclear_warhead prefab specifically
-//   /probe cctv                 R2  — CCTV parented to you; prints its bookmark identifier
-//   /probe cctvstop             R2  — remove it
-//   /probe siren [x y z]        R6  — pulse the air-raid sound via Effect.server.Run (run 1: REJECTED by engine)
-//   /probe spawn <path>         R6b — spawn an asset path as an entity; prints components (AudioSource?)
-//   /probe marker               R7  — spawn the generic-radius map marker at your feet
-//   /probe markerstop           R7  — remove it
-//   /probe plume                R9  — 4 neutered FireBalls parented to you
-//   /probe plumestop            R9  — remove them
-//   /probe fx <prefab> [x y z]  R4  — broadcast an effect at a point (default: 2 km ahead)
-//   /probe ddraw                R3  — draw test primitives for 30 s
-//   /probe supply on|off        R5  — suppress SupplySignal.Explode (vanilla cargo plane)
+// PROTOCOL (one probe at a time; every probe has its own command):
+//   /probe <ID> [args]                 start a probe
+//   /probe <ID> end [observation...]   end it: your observation is logged, cleanup runs
+//   /probe abort                       end whatever is running, with cleanup
+//   /probe status | /probe help
+// IDs: R0 R1 R2 R3 R4 R5 R6 R6b R7 R8 R9 R10
+// Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
-// If the compiler complains about HarmonyLib (R5 only), delete the R5 region and its command case.
+// Every probe auto-ends after its timeout and runs its cleanup list in reverse.
+// Logs:
+//   carbon/logs/TheatricalNukeProbe/<ID>_<yyyyMMdd-HHmmss>.log   one file per run
+//   carbon/logs/TheatricalNukeProbe/probe-errors.log             every caught exception
+//
+// Test server only. R5 patches SupplySignal.Explode while armed.
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using Carbon.Plugins;
 using HarmonyLib;
 using Oxide.Plugins;
@@ -33,548 +33,706 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.2.0")]
-[Description("M0 probes: prefab spawnability, CCTV parenting, siren reach, map marker, plumes.")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.3.0")]
+[Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string MissilePrefab =
-        "assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab";
+    private const string Version = "0.3.0";
+    private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
+    private const string HarmonyId = "theatricalnuke.probe";
 
-    private const string BusPrefab =
-        "assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab";
+    private const string MissilePrefab = "assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab";
+    private const string BusPrefab = "assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab";
+    // Folder name contains a SPACE ("air raid"), confirmed by the R4 run-2 result. Run 1 used an underscore and failed.
+    private const string SirenPrefab = "assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab";
+    private const string CctvPrefab = "assets/prefabs/deployable/cctvcamera/cctv.static.prefab";
+    private const string MarkerPrefab = "assets/prefabs/tools/map/genericradiusmarker.prefab";
+    private const string PlumePrefab = "assets/prefabs/npc/m2bradley/oilfireball2.prefab";
 
-    private const string SirenPrefab =
-        "assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab";
-
-    private const string PlumePrefab =
-        "assets/prefabs/npc/m2bradley/oilfireball2.prefab";
-
-    private const string CctvPrefab =
-        "assets/prefabs/deployable/cctvcamera/cctv.static.prefab";
-
-    private const string MarkerPrefab =
-        "assets/prefabs/tools/map/genericradiusmarker.prefab";
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R7", "R8", "R9", "R10" };
+    private static readonly float[] MarkerRadii = { 5f, 25f, 60f };
 
     private static TheatricalNukeProbe _instance;
-    private static bool _suppressSupply;
+    private static bool _r5Armed;
 
-    private readonly List<BaseEntity> _temporary = new List<BaseEntity>();
-
-    private CCTV_RC _cctv;
+    private ProbeRun _active;
     private Harmony _harmony;
 
+    // ── lifecycle ────────────────────────────────────────────────────────────────────────────────
     private void Loaded()
     {
         _instance = this;
-        Puts("TheatricalNukeProbe v0.2 loaded.");
-        Puts("Commands: /probe spawn <prefab> | missile | bus | cctv | cctvstop | siren [x y z] | " +
-             "marker | markerstop | plume | plumestop | fx <prefab> [x y z] | ddraw | supply on|off");
+        Puts($"TheatricalNukeProbe v{Version} loaded. Protocol: /probe <ID> [args]  |  /probe <ID> end [observation]  |  /probe abort");
     }
 
     private void Unload()
     {
-        try { _harmony?.UnpatchAll("theatricalnuke.probe"); }
-        catch (Exception ex) { Puts("unpatch failed: " + ex.Message); }
-
-        _harmony = null;
-        _suppressSupply = false;
-
-        ClearTemporary();
-        _instance = null;
+        try
+        {
+            if (_active != null) EndProbe(_active, "aborted: plugin unloading", string.Empty, null);
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(null, "Unload", ex);
+        }
+        finally
+        {
+            _r5Armed = false;
+            try { _harmony?.UnpatchAll(HarmonyId); }
+            catch (Exception ex) { ErrorLog(null, "Unload unpatch", ex); }
+            _harmony = null;
+            _instance = null;
+        }
     }
 
+    // ── command surface ──────────────────────────────────────────────────────────────────────────
     [ChatCommand("probe")]
     private void CmdProbe(BasePlayer player, string command, string[] args)
     {
-        if (player == null)
-        {
-            Puts("Run /probe in-game.");
-            return;
-        }
-
-        if (!player.IsAdmin)
-        {
-            player.ChatMessage("Admins only.");
-            return;
-        }
-
-        if (args == null || args.Length == 0)
-        {
-            player.ChatMessage("/probe spawn <prefab> | missile | bus | cctv | cctvstop | " +
-                               "siren [x y z] | marker | markerstop | plume | plumestop | " +
-                               "fx <prefab> [x y z] | ddraw | supply on|off");
-            return;
-        }
-
         try
         {
-            switch (args[0].ToLowerInvariant())
+            if (player == null)
             {
-                case "spawn":
-                    if (args.Length < 2) { player.ChatMessage("/probe spawn <prefab>"); break; }
-                    ProbeSpawn(player, args[1]);
-                    break;
-
-                case "missile":
-                    ProbeSpawn(player, MissilePrefab);
-                    break;
-
-                case "bus":
-                    ProbeSpawn(player, BusPrefab);
-                    break;
-
-                case "cctv":
-                    ProbeCctv(player);
-                    break;
-
-                case "cctvstop":
-                    if (_cctv != null && !_cctv.IsDestroyed) _cctv.Kill();
-                    _cctv = null;
-                    player.ChatMessage("R2: CCTV removed.");
-                    break;
-
-                case "siren":
-                    ProbeSiren(player, args);
-                    break;
-
-                case "marker":
-                    ProbeMarker(player);
-                    break;
-
-                case "markerstop":
-                    ClearTemporary();
-                    player.ChatMessage("R7: temporary entities removed.");
-                    break;
-
-                case "plume":
-                    ProbePlume(player);
-                    break;
-
-                case "plumestop":
-                    ClearTemporary();
-                    player.ChatMessage("R9: temporary entities removed.");
-                    break;
-
-                case "fx":
-                    ProbeFx(player, args);
-                    break;
-
-                case "ddraw":
-                    ProbeDdraw(player);
-                    break;
-
-                case "supply":
-                    ProbeSupply(player, args.Length > 1 &&
-                                          args[1].Equals("on", StringComparison.OrdinalIgnoreCase));
-                    break;
-
-                default:
-                    player.ChatMessage("Unknown probe: " + args[0]);
-                    break;
+                Puts("[PROBE] Run /probe in-game as an admin.");
+                return;
             }
-        }
-        catch (Exception ex)
-        {
-            Puts("probe threw: " + ex);
-            player.ChatMessage("Probe threw; see console.");
-        }
-    }
 
-    // ── R8 / R1: generic prefab spawnability ─────────────────────────────────────────────────────
-    private void ProbeSpawn(BasePlayer player, string prefabPath)
-    {
-        Puts("=== spawn probe: " + prefabPath + " ===");
-
-        GameObject prefab = null;
-
-        try
-        {
-            prefab = GameManager.server.FindPrefab(prefabPath);
-        }
-        catch (Exception ex)
-        {
-            Puts("FindPrefab threw: " + ex);
-        }
-
-        if (prefab == null)
-        {
-            Puts("FindPrefab -> NULL (the server cannot load this asset path)");
-            player.ChatMessage("FindPrefab returned null. Wrong path for this build, or not a server asset.");
-            return;
-        }
-
-        Puts("FindPrefab -> OK: " + prefab.name);
-
-        try
-        {
-            var names = prefab.GetComponents<Component>()
-                .Select(c => c == null ? "<missing>" : c.GetType().Name)
-                .ToArray();
-            Puts("components: " + string.Join(", ", names));
-
-            var entityComponent = prefab.GetComponent<BaseEntity>();
-            Puts("BaseEntity component -> " +
-                 (entityComponent == null ? "NONE (effect/decorative prefab)" : entityComponent.GetType().FullName));
-        }
-        catch (Exception ex)
-        {
-            Puts("component dump threw: " + ex);
-        }
-
-        BaseEntity spawned = null;
-
-        try
-        {
-            var pos = player.transform.position + player.transform.forward * 8f + Vector3.up * 2f;
-            spawned = GameManager.server.CreateEntity(prefabPath, pos, Quaternion.identity);
-        }
-        catch (Exception ex)
-        {
-            Puts("CreateEntity threw: " + ex);
-        }
-
-        if (spawned == null)
-        {
-            Puts("CreateEntity -> NULL (not spawnable as an entity; try /probe fx for an effect)");
-            player.ChatMessage("Not spawnable as an entity. If it is a sound/particle, use /probe fx.");
-            return;
-        }
-
-        Puts("CreateEntity -> " + spawned.GetType().FullName);
-
-        try
-        {
-            spawned.Spawn();
-            _temporary.Add(spawned);
-            Puts("Spawn() -> OK, net.id=" + (spawned.net == null ? 0u : spawned.net.ID));
-            player.ChatMessage("Spawned " + spawned.GetType().Name + " in front of you (use markerstop to clear).");
-
-            timer.Once(60f, () =>
+            if (!player.IsAdmin)
             {
-                try { if (spawned != null && !spawned.IsDestroyed) spawned.Kill(); }
-                catch { }
-            });
-        }
-        catch (Exception ex)
-        {
-            Puts("Spawn() threw: " + ex);
-        }
-    }
-
-    // ── R2: CCTV parenting ────────────────────────────────────────────────────────────────────────
-    private void ProbeCctv(BasePlayer player)
-    {
-        Puts("=== R2: CCTV parenting ===");
-
-        if (_cctv != null && !_cctv.IsDestroyed) _cctv.Kill();
-        _cctv = null;
-
-        var pos = player.transform.position + player.transform.forward * 3f + Vector3.up * 1.5f;
-        var forward = (player.transform.position - pos).normalized;
-
-        CCTV_RC cctv = null;
-
-        try
-        {
-            cctv = GameManager.server.CreateEntity(CctvPrefab, pos, Quaternion.LookRotation(forward, Vector3.up)) as CCTV_RC;
-        }
-        catch (Exception ex)
-        {
-            Puts("CreateEntity threw: " + ex);
-        }
-
-        if (cctv == null)
-        {
-            Puts("CreateEntity -> NULL, or the prefab is not a CCTV_RC");
-            player.ChatMessage("R2: could not spawn CCTV. See console.");
-            return;
-        }
-
-        try
-        {
-            cctv.Spawn();
-            _cctv = cctv;
-            Puts("CCTV spawned: " + cctv.GetType().FullName + " net.id=" + (cctv.net == null ? 0u : cctv.net.ID));
-            Puts("ConsumptionAmount -> " + SafeInt(cctv.ConsumptionAmount));
-
-            var identifier = ((IRemoteControllable)cctv).GetIdentifier();
-            Puts("identifier -> " + identifier);
-            player.ChatMessage("R2: CCTV id = " + identifier);
-            player.ChatMessage("Add it at a computer station, then walk around and watch the feed.");
-        }
-        catch (Exception ex)
-        {
-            Puts("spawn/identifier threw: " + ex);
-        }
-
-        try
-        {
-            cctv.SetParent(player, worldPositionStays: true);
-            Puts("SetParent(player, worldPositionStays: true) -> OK");
-            player.ChatMessage("R2: camera is parented to you — the feed should move as you walk.");
-        }
-        catch (Exception ex)
-        {
-            Puts("SetParent threw: " + ex);
-        }
-    }
-
-    // ── R6: siren reach + latecomer ──────────────────────────────────────────────────────────────
-    private void ProbeSiren(BasePlayer player, string[] args)
-    {
-        Vector3 pos;
-
-        if (args.Length >= 4 &&
-            float.TryParse(args[1], out var x) &&
-            float.TryParse(args[2], out var y) &&
-            float.TryParse(args[3], out var z))
-        {
-            pos = new Vector3(x, y, z);
-        }
-        else
-        {
-            pos = player.transform.position + player.transform.forward * 400f;
-        }
-
-        var distance = Vector3.Distance(player.transform.position, pos);
-        Puts($"=== R6: siren '{SirenPrefab}' at {pos} (distance {distance:0} m) ===");
-        Puts("Pulsing every 8 s for 40 s. Listen, then move far away and back.");
-
-        try
-        {
-            Effect.server.Run(SirenPrefab, pos, Vector3.up, null, true);
-            Puts("pulse 1 submitted to Effect.server.Run (no return value: check the console for 'unknown effect' lines)");
-        }
-        catch (Exception ex)
-        {
-            Puts("Effect.server.Run threw: " + ex);
-            return;
-        }
-
-        timer.Repeat(8f, 4, () =>
-        {
-            try
-            {
-                Effect.server.Run(SirenPrefab, pos, Vector3.up, null, true);
-                Puts("siren pulse submitted (check for 'unknown effect' lines above)");
+                player.ChatMessage("Admins only.");
+                return;
             }
-            catch (Exception ex)
+
+            if (args == null || args.Length == 0 || args[0].Equals("help", StringComparison.OrdinalIgnoreCase))
             {
-                Puts("siren pulse threw: " + ex.Message);
+                Help(player);
+                return;
             }
-        });
 
-        player.ChatMessage($"R6: siren at {distance:0} m, pulsing for 40 s. Note how far you can hear it.");
-    }
+            var first = args[0];
 
-    // ── R7: map marker ───────────────────────────────────────────────────────────────────────────
-    private void ProbeMarker(BasePlayer player)
-    {
-        Puts("=== R7: generic radius marker ===");
-
-        var pos = player.transform.position + player.transform.forward * 5f;
-
-        MapMarkerGenericRadius marker = null;
-
-        try
-        {
-            marker = GameManager.server.CreateEntity(MarkerPrefab, pos, Quaternion.identity) as MapMarkerGenericRadius;
-        }
-        catch (Exception ex)
-        {
-            Puts("CreateEntity threw: " + ex);
-        }
-
-        if (marker == null)
-        {
-            Puts("CreateEntity -> NULL, or the prefab is not a MapMarkerGenericRadius");
-            player.ChatMessage("R7: marker spawn failed. See console.");
-            return;
-        }
-
-        try
-        {
-            marker.radius = 60f;
-            marker.color1 = new Color(1f, 0.20f, 0.85f, 1f);
-            marker.color2 = new Color(1f, 0.20f, 0.85f, 1f);
-            marker.alpha = 0.55f;
-            marker.Spawn();
-            marker.SendUpdate();
-            _temporary.Add(marker);
-
-            Puts("marker spawned, net.id=" + (marker.net == null ? 0u : marker.net.ID));
-            player.ChatMessage("R7: purple 60 m circle should appear at your feet on the map — for EVERY player, not just you.");
-            player.ChatMessage("Ask a second player to confirm they see it.");
-        }
-        catch (Exception ex)
-        {
-            Puts("marker spawn threw: " + ex);
-        }
-    }
-
-    // ── R9: FireBall plumes ──────────────────────────────────────────────────────────────────────
-    private void ProbePlume(BasePlayer player)
-    {
-        Puts("=== R9: FireBall plumes (oilfireball2) ===");
-
-        var origin = player.transform.position + player.transform.forward * 4f + Vector3.up * 3f;
-
-        for (var i = 0; i < 4; i++)
-        {
-            try
+            if (first.Equals("status", StringComparison.OrdinalIgnoreCase))
             {
-                var offset = new Vector3((i - 1.5f) * 0.8f, 0f, 0f);
-                var fire = GameManager.server.CreateEntity(PlumePrefab, origin + offset, Quaternion.identity) as FireBall;
+                player.ChatMessage(_active == null ? "No probe running." : $"Running: {_active.Id} (log: {_active.LogPath})");
+                return;
+            }
 
-                if (fire == null)
+            if (first.Equals("abort", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_active == null) player.ChatMessage("No probe running.");
+                else EndProbe(_active, "aborted by operator", string.Empty, player);
+                return;
+            }
+
+            var id = NormaliseId(first);
+            if (id == null)
+            {
+                player.ChatMessage($"Unknown probe '{first}'. Known: {string.Join(" ", KnownIds)}");
+                return;
+            }
+
+            var rest = args.Skip(1).ToArray();
+
+            if (rest.Length > 0 && rest[0].Equals("end", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_active == null || !_active.Id.Equals(id, StringComparison.Ordinal))
                 {
-                    Puts("CreateEntity -> NULL or not a FireBall");
-                    break;
+                    player.ChatMessage($"{id} is not running.");
+                    return;
                 }
 
-                // Neuter: no damage, no spreading, long life so it does not vanish mid-test.
-                fire.damagePerSecond = 0f;
-                fire.radius = 0f;
-                fire.spreadSubEntity = null;
-                fire.canMerge = false;
-                fire.lifeTimeMin = 300f;
-                fire.lifeTimeMax = 300f;
-                fire.ignoreNPC = true;
+                var observation = string.Join(" ", rest.Skip(1));
+                EndProbe(_active, "ended by operator", observation, player);
+                return;
+            }
 
-                fire.Spawn();
-                fire.SetParent(player, worldPositionStays: true);
-                _temporary.Add(fire);
+            if (_active != null)
+            {
+                player.ChatMessage($"{_active.Id} is still running. End it with /probe {_active.Id} end, or /probe abort.");
+                return;
+            }
 
-                Puts($"plume {i + 1}: spawned and parented, {fire.GetType().Name}");
+            StartProbe(id, rest, player);
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(_active, "CmdProbe", ex);
+            if (player != null) player.ChatMessage("Probe error — see carbon/logs/TheatricalNukeProbe/probe-errors.log");
+        }
+    }
+
+    private void Help(BasePlayer player)
+    {
+        player.ChatMessage("Probes: R0 R1 R2 R3 R4 R5 R6 R6b R7 R8 R9 R10");
+        player.ChatMessage("Start: /probe <ID> [args]    End: /probe <ID> end <observation>");
+        player.ChatMessage("R4 <path> [x y z]   R6 [metres]   R6b [path] [x y z]   R7 (radius sweep)   R9 [spacing]");
+        player.ChatMessage("Also: /probe status, /probe abort");
+    }
+
+    private static string NormaliseId(string input)
+    {
+        foreach (var known in KnownIds)
+        {
+            if (known.Equals(input, StringComparison.OrdinalIgnoreCase)) return known;
+        }
+
+        return null;
+    }
+
+    // ── run lifecycle ────────────────────────────────────────────────────────────────────────────
+    private void StartProbe(string id, string[] a, BasePlayer op)
+    {
+        var started = DateTime.UtcNow;
+        var run = new ProbeRun
+        {
+            Id = id,
+            OperatorId = op.userID,
+            StartUtc = started,
+            Args = a ?? new string[0],
+            LogPath = Path.Combine(LogDirectory, $"{id}_{started:yyyyMMdd-HHmmss}.log"),
+        };
+
+        _active = run;
+        Banner(run, "START", $"v{Version} args=[{string.Join(" | ", run.Args)}] operator={op.userID}");
+
+        try
+        {
+            switch (id)
+            {
+                case "R0": ProbeR0(run, op); break;
+                case "R1": ProbeR1(run, op); break;
+                case "R2": ProbeR2(run, op); break;
+                case "R3": ProbeR3(run, op); break;
+                case "R4": ProbeR4(run, op); break;
+                case "R5": ProbeR5(run, op); break;
+                case "R6": ProbeR6(run, op); break;
+                case "R6b": ProbeR6b(run, op); break;
+                case "R7": ProbeR7(run, op); break;
+                case "R8": ProbeR8(run, op); break;
+                case "R9": ProbeR9(run, op); break;
+                case "R10":
+                    run.TimeoutSeconds = 5f;
+                    Line(run, "NOTE", "R10 is not implemented yet. It needs a safe-zone test spec (Q17).");
+                    break;
+                default:
+                    Line(run, "NOTE", "no handler for this id");
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "probe body", ex);
+            Line(run, "ERROR", "probe body threw; see probe-errors.log. Cleanup still runs when you end it.");
+        }
+
+        var timeout = run.TimeoutSeconds;
+        timer.Once(timeout, () =>
+        {
+            if (!run.Ended) EndProbe(run, $"auto-ended after {timeout:0} s timeout", string.Empty, null);
+        });
+
+        op.ChatMessage($"{id} running. Log: {run.LogPath}. End with: /probe {id} end <observation>");
+    }
+
+    private void EndProbe(ProbeRun run, string outcome, string observation, BasePlayer op)
+    {
+        if (run == null || run.Ended) return;
+        run.Ended = true;
+        if (ReferenceEquals(_active, run)) _active = null;
+
+        try
+        {
+            if (!string.IsNullOrEmpty(observation)) Line(run, "OBSERVE", observation);
+
+            var status = RunCleanup(run);
+            var duration = (DateTime.UtcNow - run.StartUtc).TotalSeconds;
+            Banner(run, "END", $"outcome={outcome}; cleanup={status}; duration={duration:0.0}s");
+            op?.ChatMessage($"{run.Id} ended ({outcome}). Cleanup: {status}. Log: {run.LogPath}");
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "EndProbe", ex);
+        }
+    }
+
+    private string RunCleanup(ProbeRun run)
+    {
+        var failed = 0;
+
+        for (var i = run.Cleanup.Count - 1; i >= 0; i--)
+        {
+            var item = run.Cleanup[i];
+
+            try
+            {
+                var detail = item.Run();
+                Line(run, "CLEANUP", $"OK   {item.Label}: {detail}");
             }
             catch (Exception ex)
             {
-                Puts("plume threw: " + ex);
+                failed++;
+                Line(run, "CLEANUP", $"FAIL {item.Label}: {ex.GetType().Name}: {ex.Message}");
+                ErrorLog(run, "cleanup " + item.Label, ex);
             }
         }
 
-        player.ChatMessage("R9: 4 plumes parented to you. Do they follow you? Do they look like booster flames?");
-        player.ChatMessage("Check: did anything catch fire or take damage? Use /probe plumestop to clear.");
+        run.Cleanup.Clear();
+        return failed == 0 ? "OK" : $"{failed} FAILED";
+    }
+
+    private static void Track(ProbeRun run, BaseEntity entity, string label)
+    {
+        run.Cleanup.Add(new CleanupItem
+        {
+            Label = "kill " + label,
+            Run = () =>
+            {
+                if (entity == null) return "already null";
+                if (entity.IsDestroyed) return "already destroyed";
+                entity.Kill();
+                return "killed; IsDestroyed=" + entity.IsDestroyed;
+            },
+        });
+    }
+
+    // ── logging ──────────────────────────────────────────────────────────────────────────────────
+    private void Line(ProbeRun run, string tag, string message)
+    {
+        var text = $"[{DateTime.UtcNow:HH:mm:ss.fff}] [PROBE {run.Id}] {tag,-8} {message}";
+        Puts(text);
+        Append(run.LogPath, text);
+        if (tag == "RESULT") run.Results.Add(message);
+    }
+
+    private void Banner(ProbeRun run, string phase, string detail)
+    {
+        var text = $"########## PROBE {run.Id} {phase} ########## {detail}";
+        Puts(text);
+        Append(run.LogPath, text);
+    }
+
+    private void ErrorLog(ProbeRun run, string where, Exception ex)
+    {
+        try
+        {
+            var text = $"[{DateTime.UtcNow:o}] [{run?.Id ?? "-"}] {where}: {ex}";
+            Puts("[PROBE ERROR] " + text);
+            Append(Path.Combine(LogDirectory, "probe-errors.log"), text);
+            if (run != null) Append(run.LogPath, $"ERROR    {where}: {ex.GetType().Name}: {ex.Message}");
+        }
+        catch
+        {
+            // Logging must never throw into the server loop.
+        }
+    }
+
+    private static void Append(string path, string text)
+    {
+        try
+        {
+            Directory.CreateDirectory(LogDirectory);
+            File.AppendAllText(path, text + Environment.NewLine, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning("[TheatricalNukeProbe] could not write " + path + ": " + ex.Message);
+        }
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────────────────────────
+    private static float? ParseFloat(string[] a, int i)
+    {
+        if (a == null || i < 0 || i >= a.Length) return null;
+        return float.TryParse(a[i], out var v) ? v : (float?)null;
+    }
+
+    private static Vector3? ParseVec(string[] a, int start)
+    {
+        if (a == null || a.Length < start + 3) return null;
+        var x = ParseFloat(a, start);
+        var y = ParseFloat(a, start + 1);
+        var z = ParseFloat(a, start + 2);
+        if (x == null || y == null || z == null) return null;
+        return new Vector3(x.Value, y.Value, z.Value);
+    }
+
+    private static bool IsNumber(string s) => float.TryParse(s, out _);
+
+    private static Vector3 InFront(BasePlayer p, float metres, float up = 0f) =>
+        p.transform.position + p.transform.forward * metres + Vector3.up * up;
+
+    private void DumpAudio(ProbeRun run, GameObject go, string label)
+    {
+        if (go == null)
+        {
+            Line(run, "AUDIO", $"{label}: no object to inspect");
+            return;
+        }
+
+        var sources = go.GetComponentsInChildren<AudioSource>(true);
+        Line(run, "AUDIO", $"{label}: {sources.Length} AudioSource component(s) on {go.name}");
+
+        foreach (var s in sources)
+        {
+            var clip = s.clip != null ? s.clip.name : "none";
+            Line(run, "AUDIO",
+                $"  on '{s.gameObject.name}' clip={clip} playOnAwake={s.playOnAwake} loop={s.loop} " +
+                $"volume={s.volume:0.00} minDist={s.minDistance:0} maxDist={s.maxDistance:0} isPlaying={s.isPlaying}");
+        }
+    }
+
+    // ── R0: environment ──────────────────────────────────────────────────────────────────────────
+    private void ProbeR0(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 600f;
+        Line(run, "STEP", $"probe plugin v{Version}; server UTC {DateTime.UtcNow:o}");
+        Line(run, "STEP", $"operator position {p.transform.position}");
+        Line(run, "STEP", "Paste into the end observation: c.version output, Rust build banner, map name and seed, test or live.");
+    }
+
+    // ── R1: missile prefab ───────────────────────────────────────────────────────────────────────
+    private void ProbeR1(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 120f;
+        var go = GameManager.server.FindPrefab(MissilePrefab);
+        if (go == null)
+        {
+            Line(run, "RESULT", "FindPrefab returned null — wrong path for this build");
+            return;
+        }
+
+        Line(run, "STEP", $"FindPrefab OK: {go.name}");
+        var names = go.GetComponents<Component>().Select(c => c == null ? "<missing>" : c.GetType().Name);
+        Line(run, "STEP", "root components: " + string.Join(", ", names));
+        Line(run, "STEP", "BaseEntity on root: " + (go.GetComponent<BaseEntity>() != null));
+
+        BaseEntity e = null;
+        try
+        {
+            e = GameManager.server.CreateEntity(MissilePrefab, InFront(p, 8f, 2f), Quaternion.identity);
+        }
+        catch (Exception ex)
+        {
+            Line(run, "STEP", $"CreateEntity threw {ex.GetType().Name}: {ex.Message}");
+        }
+
+        if (e == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null: missile prefab is not spawnable as an entity (matches run 1)");
+            return;
+        }
+
+        Track(run, e, "missile entity");
+        e.Spawn();
+        Line(run, "RESULT", $"CreateEntity returned {e.GetType().Name}; spawned 8 m in front. Look at it and report.");
+    }
+
+    // ── R2: CCTV identifiers and parenting ───────────────────────────────────────────────────────
+    private void ProbeR2(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 600f;
+
+        var existing = UnityEngine.Object.FindObjectsOfType<CCTV_RC>();
+        var ids = new List<string>();
+        foreach (var cam in existing)
+        {
+            if (cam == null) continue;
+            var id = ((IRemoteControllable)cam).GetIdentifier();
+            ids.Add(id);
+            Line(run, "STEP", $"existing CCTV_RC id={id} pos={cam.transform.position} static={cam.IsStatic()}");
+        }
+
+        var duplicates = ids.GroupBy(x => x).Where(g => g.Count() > 1).Select(g => $"{g.Key} x{g.Count()}").ToArray();
+        Line(run, "STEP", $"survey: {ids.Count} CCTV_RC on the server; duplicate identifiers: {(duplicates.Length == 0 ? "none" : string.Join(", ", duplicates))}");
+
+        var cctv = GameManager.server.CreateEntity(CctvPrefab, InFront(p, 3f, 1.5f), Quaternion.LookRotation((p.transform.position - InFront(p, 3f, 1.5f)).normalized, Vector3.up)) as CCTV_RC;
+        if (cctv == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null or not a CCTV_RC");
+            return;
+        }
+
+        cctv.Spawn();
+        Track(run, cctv, "cctv");
+
+        var own = ((IRemoteControllable)cctv).GetIdentifier();
+        var occurrences = ids.Count(x => x == own) + 1;
+        Line(run, "RESULT", $"own identifier={own}; occurrences including this camera={occurrences}");
+
+        cctv.SetParent(p, worldPositionStays: true);
+        Line(run, "STEP", "parented to operator (worldPositionStays: true)");
+        Line(run, "STEP", "NEXT: add the identifier at a computer station. Then walk, jump, turn. Report the feed and which camera it shows.");
     }
 
     // ── R3: debug drawing ────────────────────────────────────────────────────────────────────────
-    private void ProbeDdraw(BasePlayer player)
+    private void ProbeR3(ProbeRun run, BasePlayer p)
     {
-        Puts("=== R3: ddraw ===");
+        run.TimeoutSeconds = 60f;
+        var origin = p.transform.position;
 
-        var p = player.transform.position;
+        p.SendConsoleCommand("ddraw.line", 30f, Color.red, origin, origin + Vector3.up * 5f);
+        p.SendConsoleCommand("ddraw.sphere", 30f, Color.cyan, origin + p.transform.forward * 5f, 1f);
+        p.SendConsoleCommand("ddraw.text", 30f, Color.white, origin + Vector3.up * 6f, "R3 PROBE");
+        Line(run, "STEP", "drew line, sphere, text (30 s duration)");
 
-        try
+        run.Cleanup.Add(new CleanupItem
         {
-            player.SendConsoleCommand("ddraw.line", 30f, Color.red, p, p + Vector3.up * 5f);
-            player.SendConsoleCommand("ddraw.sphere", 30f, Color.cyan, p + player.transform.forward * 5f, 1f);
-            player.SendConsoleCommand("ddraw.text", 30f, Color.white, p + Vector3.up * 6f, "PROBE");
-            Puts("ddraw.line/sphere/text sent (30 s).");
-            player.ChatMessage("R3: drawn for 30 s. Now type 'ddraw.clear' in F1 and report what happens.");
-        }
-        catch (Exception ex)
+            Label = "ddraw.clear",
+            Run = () =>
+            {
+                p.SendConsoleCommand("ddraw.clear");
+                return "sent";
+            },
+        });
+
+        timer.Once(10f, () =>
         {
-            Puts("ddraw threw: " + ex);
-        }
+            if (run.Ended) return;
+            p.SendConsoleCommand("ddraw.clear");
+            Line(run, "STEP", "sent ddraw.clear at +10 s; report whether the lines vanished");
+        });
     }
 
-    // ── R4: broadcast effect ─────────────────────────────────────────────────────────────────────
-    private void ProbeFx(BasePlayer player, string[] args)
+    // ── R4: generic broadcast effect ─────────────────────────────────────────────────────────────
+    private void ProbeR4(ProbeRun run, BasePlayer p)
     {
-        if (args.Length < 2)
+        run.TimeoutSeconds = 30f;
+        var path = run.Args.Length > 0 && !IsNumber(run.Args[0]) ? run.Args[0] : SirenPrefab;
+        var offset = path == (run.Args.Length > 0 ? run.Args[0] : null) ? 1 : 0;
+        var pos = ParseVec(run.Args, offset) ?? InFront(p, 2000f);
+        var distance = Vector3.Distance(p.transform.position, pos);
+
+        Line(run, "STEP", $"effect path='{path}' at {pos} ({distance:0} m from operator)");
+        Effect.server.Run(path, pos, Vector3.up, null, true);
+        Line(run, "RESULT", "submitted to Effect.server.Run (returns nothing). Check the console for 'unknown effect' within 2 s, then report what you heard.");
+    }
+
+    // ── R5: supply signal, keep smoke, suppress the cargo plane ─────────────────────────────────
+    private void ProbeR5(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 300f;
+
+        _harmony = new Harmony(HarmonyId);
+        _harmony.PatchAll(GetType().Assembly);
+        _r5Armed = true;
+
+        run.Cleanup.Add(new CleanupItem { Label = "disarm R5 prefix", Run = () => { _r5Armed = false; return "disarmed"; } });
+        run.Cleanup.Add(new CleanupItem
         {
-            player.ChatMessage("/probe fx <prefab> [x y z]");
+            Label = "unpatch " + HarmonyId,
+            Run = () =>
+            {
+                _harmony?.UnpatchAll(HarmonyId);
+                _harmony = null;
+                return "unpatched";
+            },
+        });
+
+        Line(run, "STEP", "armed. Throw one Supply Signal. Expect: smoke at the landing point, NO cargo plane, signal stays until its 210 s FinishUp.");
+        Line(run, "STEP", "Report: smoke yes/no, plane yes/no, signal lifetime. Each intercept is logged below as INTERCEPT.");
+    }
+
+    // Called from the prefix when R5 is armed.
+    private void OnR5Intercept(SupplySignal signal)
+    {
+        var run = _active;
+        if (run == null || !run.Id.Equals("R5", StringComparison.Ordinal)) return;
+        Line(run, "INTERCEPT", $"SupplySignal at {signal.transform.position}; cargo plane suppressed; Flags.On set; FinishUp in 210 s");
+    }
+
+    // ── R6: siren through Effect.server.Run (run 1 and run 2 were negative) ─────────────────────
+    private void ProbeR6(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        var distance = ParseFloat(run.Args, 0) ?? 1f;
+        var pos = InFront(p, distance);
+
+        Line(run, "STEP", $"Effect.server.Run(SirenPrefab) at {distance:0.0} m, single pulse");
+        Effect.server.Run(SirenPrefab, pos, Vector3.up, null, true);
+        Line(run, "RESULT", "submitted. Check the console for 'unknown effect'. Report whether you heard it and at what distance.");
+    }
+
+    // ── R6b: siren as a spawned entity (the route the working siren plugin appears to use) ──────
+    private void ProbeR6b(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 120f;
+
+        var hasPath = run.Args.Length > 0 && !IsNumber(run.Args[0]);
+        var path = hasPath ? run.Args[0] : SirenPrefab;
+        var pos = ParseVec(run.Args, hasPath ? 1 : 0) ?? InFront(p, 1f, 1f);
+
+        var go = GameManager.server.FindPrefab(path);
+        if (go == null)
+        {
+            Line(run, "RESULT", $"FindPrefab null for '{path}'. Check the path and quoting.");
             return;
         }
 
-        var prefab = args[1];
-        Vector3 pos;
+        Line(run, "STEP", $"FindPrefab OK: {go.name} (path='{path}')");
+        DumpAudio(run, go, "prefab");
 
-        if (args.Length >= 5 &&
-            float.TryParse(args[2], out var x) &&
-            float.TryParse(args[3], out var y) &&
-            float.TryParse(args[4], out var z))
+        var entity = GameManager.server.CreateEntity(path, pos, Quaternion.identity);
+        if (entity == null)
         {
-            pos = new Vector3(x, y, z);
-        }
-        else
-        {
-            pos = player.transform.position + player.transform.forward * 2000f;
+            Line(run, "RESULT", "CreateEntity returned null: not an entity; this route fails for this asset.");
+            return;
         }
 
-        var distance = Vector3.Distance(player.transform.position, pos);
-        Puts($"=== R4: broadcast '{prefab}' at {pos} (distance {distance:0} m) ===");
+        Track(run, entity, "siren entity");
+        entity.Spawn();
+        Line(run, "STEP", $"spawned {entity.GetType().Name} at {pos}; net id={(entity.net != null ? entity.net.ID : 0u)}");
+        DumpAudio(run, entity.gameObject, "live");
 
-        try
-        {
-            Effect.server.Run(prefab, pos, Vector3.up, null, true);
-            Puts("Effect.server.Run(..., broadcast: true) submitted (no return value: check for 'unknown effect' lines above)");
-            player.ChatMessage($"R4: submitted at {distance:0} m. Silence + an 'unknown effect' console line means the path is not in the effect pool."); 
-        }
-        catch (Exception ex)
-        {
-            Puts("Effect.server.Run threw: " + ex);
-        }
+        timer.Once(2f, () => AudioCheck(run, entity, "+2 s"));
+        timer.Once(10f, () => AudioCheck(run, entity, "+10 s"));
+        Line(run, "STEP", "NEXT: listen at 1 m, then walk out to 200, 800, 1900 m and report where it stops. /probe R6b end <observation>");
     }
 
-    // ── R5: supply-signal suppression ────────────────────────────────────────────────────────────
-    private void ProbeSupply(BasePlayer player, bool enabled)
+    private void AudioCheck(ProbeRun run, BaseEntity entity, string when)
     {
-        _suppressSupply = enabled;
-
-        if (enabled)
+        if (run.Ended) return;
+        if (entity == null || entity.IsDestroyed)
         {
-            if (_harmony == null)
+            Line(run, "AUDIO", $"{when}: entity is gone");
+            return;
+        }
+
+        var playing = entity.gameObject.GetComponentsInChildren<AudioSource>(true).Count(s => s.isPlaying);
+        Line(run, "AUDIO", $"{when}: AudioSources currently playing = {playing}");
+    }
+
+    // ── R7: marker radius sweep (units and visibility) ───────────────────────────────────────────
+    private void ProbeR7(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 120f;
+
+        var marker = GameManager.server.CreateEntity(MarkerPrefab, InFront(p, 5f), Quaternion.identity) as MapMarkerGenericRadius;
+        if (marker == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null or not a MapMarkerGenericRadius");
+            return;
+        }
+
+        marker.color1 = new Color(1f, 0.20f, 0.85f, 1f);
+        marker.color2 = new Color(1f, 0.20f, 0.85f, 1f);
+        marker.alpha = 0.55f;
+        marker.radius = MarkerRadii[0];
+        marker.Spawn();
+        marker.SendUpdate();
+        Track(run, marker, "marker");
+        Line(run, "STEP", $"marker spawned; radius={MarkerRadii[0]} sent. Check your map now.");
+
+        run.Counter = 1;
+        timer.Repeat(20f, MarkerRadii.Length - 1, () =>
+        {
+            if (run.Ended || marker == null || marker.IsDestroyed) return;
+            var r = MarkerRadii[run.Counter];
+            marker.radius = r;
+            marker.SendUpdate();
+            Line(run, "STEP", $"radius={r} sent. Report what the map shows (size, and whether the whole map is tinted).");
+            run.Counter++;
+        });
+    }
+
+    // ── R8: bus prefab visibility ────────────────────────────────────────────────────────────────
+    private void ProbeR8(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 120f;
+        var e = GameManager.server.CreateEntity(BusPrefab, InFront(p, 8f, 2f), Quaternion.identity);
+        if (e == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null");
+            return;
+        }
+
+        e.Spawn();
+        Track(run, e, "bus");
+        Line(run, "RESULT", $"spawned {e.GetType().Name} 8 m in front. Report whether it is visible.");
+    }
+
+    // ── R9: FireBall plumes, spaced, neutered without a null spreadSubEntity ─────────────────────
+    private void ProbeR9(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 300f;
+        var spacing = ParseFloat(run.Args, 0) ?? 4f;
+        var origin = InFront(p, 10f, 1f);
+
+        for (var i = 0; i < 4; i++)
+        {
+            var offset = p.transform.right * ((i - 1.5f) * spacing);
+            var fire = GameManager.server.CreateEntity(PlumePrefab, origin + offset, Quaternion.identity) as FireBall;
+            if (fire == null)
             {
-                _harmony = new Harmony("theatricalnuke.probe");
-                _harmony.PatchAll(GetType().Assembly);
+                Line(run, "STEP", $"plume {i + 1}: CreateEntity returned null or not a FireBall");
+                continue;
             }
 
-            Puts("R5: SupplySignal.Explode patch installed.");
-            player.ChatMessage("R5: ON — throw a supply signal. No cargo plane should spawn.");
-        }
-        else
-        {
-            try { _harmony?.UnpatchAll("theatricalnuke.probe"); }
-            catch (Exception ex) { Puts("unpatch threw: " + ex); }
+            // Neuter. spreadSubEntity is left untouched: setting it to null caused NullReferenceException
+            // in FireBall.TryToSpread (run 2). TryToSpread checks `Random < 0.9 - generation*0.1` first,
+            // so generation = 1000 makes that test false and short-circuits before spreadSubEntity is read.
+            fire.damagePerSecond = 0f;
+            fire.generation = 1000f;
+            fire.canMerge = false;
+            fire.ignoreNPC = true;
+            fire.lifeTimeMin = 600f;
+            fire.lifeTimeMax = 600f;
 
-            _harmony = null;
-            Puts("R5: patch removed.");
-            player.ChatMessage("R5: OFF — vanilla supply signals restored.");
+            fire.Spawn();
+            fire.SetParent(p, worldPositionStays: true);
+            Track(run, fire, $"plume {i + 1}");
+            Line(run, "STEP", $"plume {i + 1} at {(i - 1.5f) * spacing:0.0} m lateral offset from the operator's line");
         }
+
+        Line(run, "RESULT", $"4 plumes spaced {spacing:0.0} m, parented. Report: count visible, follow, look, fire spread.");
     }
 
+    // ── value types ──────────────────────────────────────────────────────────────────────────────
+    private sealed class ProbeRun
+    {
+        public string Id;
+        public ulong OperatorId;
+        public DateTime StartUtc;
+        public bool Ended;
+        public float TimeoutSeconds = 300f;
+        public int Counter;
+        public string LogPath;
+        public string[] Args = new string[0];
+        public readonly List<CleanupItem> Cleanup = new List<CleanupItem>();
+        public readonly List<string> Results = new List<string>();
+    }
+
+    private sealed class CleanupItem
+    {
+        public string Label;
+        public Func<string> Run;
+    }
+
+    // ── R5 prefix: replicate SupplySignal.Explode minus the cargo plane ─────────────────────────
+    // Verified source (SupplySignal.cs): Explode() creates EntityToCreate (cargo plane), calls
+    // InitDropPosition, Spawn(), CallHook, Invoke(FinishUp, 210f), SetFlag(Flags.On, true),
+    // SendNetworkUpdateImmediate(). Run 2 killed the signal instead, which also removed its smoke.
     [HarmonyPatch(typeof(SupplySignal), nameof(SupplySignal.Explode))]
     private static class SupplySignalExplodePatch
     {
         private static bool Prefix(SupplySignal __instance)
         {
-            if (!_suppressSupply) return true;
+            if (!_r5Armed) return true;
 
-            _instance?.Puts("[R5] SupplySignal.Explode intercepted; vanilla cargo plane suppressed.");
-
-            try { __instance.Kill(); }
-            catch { }
+            try
+            {
+                __instance.SetFlag(BaseEntity.Flags.On, true);
+                __instance.SendNetworkUpdateImmediate();
+                __instance.Invoke(__instance.FinishUp, 210f);
+                _instance?.OnR5Intercept(__instance);
+            }
+            catch (Exception ex)
+            {
+                // Fall back to vanilla on error, so a failed probe never leaves a signal inert.
+                _instance?.ErrorLog(_instance._active, "R5 prefix (falling back to vanilla)", ex);
+                return true;
+            }
 
             return false;
         }
-    }
-
-    // ── helpers ──────────────────────────────────────────────────────────────────────────────────
-    private void ClearTemporary()
-    {
-        foreach (var entity in _temporary.ToArray())
-        {
-            try { if (entity != null && !entity.IsDestroyed) entity.Kill(); }
-            catch { }
-        }
-
-        _temporary.Clear();
-    }
-
-    private static string SafeInt(Func<int> value)
-    {
-        try { return value().ToString(); }
-        catch (Exception ex) { return "threw: " + ex.GetType().Name; }
     }
 }

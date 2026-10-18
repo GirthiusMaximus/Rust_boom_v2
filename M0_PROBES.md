@@ -132,7 +132,7 @@ Six markers appear in the last seconds. Should they read as small dots or as vis
 
 | ID | Asset | Path | Status |
 |---|---|---|---|
-| A1 | Air-raid siren | `assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab` | ✅ given |
+| A1 | Air-raid siren | `assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab` | ✅ given |
 | A2 | Water-exit cue | `assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab` | ✅ given |
 | A3 | Bus | `assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab` | ✅ given — spawnability unverified |
 | A4 | Booster plume | `assets/prefabs/npc/m2bradley/oilfireball2.prefab` | ✅ given — `FireBall` entity, needs neutering |
@@ -214,7 +214,7 @@ frames? The console prints `ConsumptionAmount` and the `SetParent` result.
 
 **Unknown:** how far does a broadcast effect actually carry?
 
-**Steps:** `/probe fx assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab` (plays 2 km
+**Steps:** `/probe fx assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab` (plays 2 km
 ahead of you). Repeat with coordinates at the far corner and stand at your original spot.
 
 **Record:** audible at 2 km? at the map edge? how loud? Any delay?
@@ -376,6 +376,44 @@ The `/probe spawn missile` and `/probe fx missile` lines were my usage error; th
 
 ### Next probe (R6b) — siren as entity
 
-`/probe spawn assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab`, then read the console for:
+`/probe spawn assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab`, then read the console for:
 the components list (look for `AudioSource`), and whether `CreateEntity` returns an entity.
 Listen 8 m away; then walk 200 m, 800 m, 1900 m away and note audibility.
+
+### Run 2 — 2026-10-17 (operator console and observations)
+
+| Probe | Result | Verdict |
+|---|---|---|
+| **R1** | Not re-run (run 1 stands). | ❌ not an entity |
+| **R2** | `CCTV_RC` spawned; identifier **COBALT1**; parented. Station with COBALT1 opened a **large oil-rig camera** and that camera entity sits under the operator. | ❌ identifiers are not unique. Next: R2 survey (lists every `CCTV_RC`, flags duplicates). |
+| **R3** | Lines drawn; `ddraw.clear` cleared them. | ✅ verified |
+| **R4** | Spaced path accepted by the pool (no error). At 1 m and 2000 m: **silent**. | ❌ effect route silent for this asset |
+| **R5** | Signal intercepted, cargo plane not seen. The probe **killed** the signal, so it also disappeared early. | ✅ plane suppressed. ⚠️ smoke lost (see R5 v2) |
+| **R6** | Run 1 used the wrong path (underscore). Not re-run as such; R4 covers the effect route. | ❌ see R4 |
+| **R6b** | Not run. | ⏳ next |
+| **R7** | Marker at radius 60 tinted the **entire map** pink. | ❌ radius is not metres. Next: sweep 5 / 25 / 60 |
+| **R8** | Bus visible. | ✅ verified |
+| **R9** | Plumes visible and follow the operator. Three `NullReferenceException`s in `FireBall.TryToSpread` (our `spreadSubEntity = null`). Plumes were stacked on the operator, so the count could not be judged. | ✅ follow. ❌ neutering bug fixed in v0.3 (`generation = 1000`); spacing added. |
+
+**Operator clarification on R9:** plume damage is acceptable because the effect is mostly outside the playable area. The real risk is a player standing on the spawn point under the water, which is judged very unlikely. Recommendation: keep damage at 0 anyway. It costs nothing, and the brief can say "no damage" rather than "damage accepted".
+
+### Probe protocol v0.3 (applies to ALL future sessions)
+
+- Every probe is its own command: `/probe R3`, `/probe R6b`, and so on.
+- Start: `/probe <ID> [args]`. End: `/probe <ID> end <observation>`. Abort: `/probe abort`.
+- Console banners: `########## PROBE R6b START ##########` … `########## PROBE R6b END ##########`. Every line carries `[PROBE <ID>]`.
+- One log file per run: `carbon/logs/TheatricalNukeProbe/<ID>_<yyyyMMdd-HHmmss>.log`, containing START, ARGS, STEP, RESULT, OBSERVE, CLEANUP lines and END.
+- Caught exceptions also go to `carbon/logs/TheatricalNukeProbe/probe-errors.log`.
+- Every probe has a timeout and runs its cleanup list in reverse on end, abort or timeout. Each cleanup line reports OK or FAIL.
+
+### Next probes (run 3)
+
+| ID | Command | Purpose |
+|---|---|---|
+| R2 | `/probe R2` | Survey all `CCTV_RC`, flag duplicate identifiers, spawn one camera, and check its identifier. |
+| R5 | `/probe R5` | v0.3 prefix keeps smoke and skips the plane. Throw a signal. |
+| R6b | `/probe R6b` | Spawn the siren entity at 1 m; report whether the `AudioSource` plays. Then walk to 200 / 800 / 1900 m. |
+| R7 | `/probe R7` | Radius sweep 5 → 25 → 60, every 20 s. Report when the map tint appears. |
+| R9 | `/probe R9 4` | Four plumes, 4 m apart, damage 0, spread disabled. |
+
+Questions for you: see the chat reply (Q22–Q25).

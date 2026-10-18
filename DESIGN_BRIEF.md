@@ -322,7 +322,7 @@ filled in; the rest are marked `ASSET-TBD`.
     "DurationSeconds": 45,
     "PulseIntervalSeconds": 8,
     "AudibleRangeMeters": 1900,
-    "Effect": "assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab",
+    "Effect": "assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab",
     "Anchors": [
       { "x": 0.0, "y": 0.0, "z": 0.0 }
     ]
@@ -454,6 +454,7 @@ compiled).
 
 | Need | Verified fact | Status |
 |---|---|---|
+| Siren asset path | **Corrected:** the folder is `air raid` (with a space). Run 1's underscore path was a transcription error on our side and produced `unknown effect`. | ✅ verified (R4 run 2: no pool error with the spaced path) |
 | Map-wide effect delivery | `Effect.server.Run(name, pos, normal, connection, broadcast: true)` → `EffectNetwork.Send` → `BaseNetworkable.GlobalNetworkGroup.subscribers` = **every connected client**. **But** a string name must already be in the engine's string pool: an asset path not in the pool logs `unknown effect` and is dropped silently (R6 run 1). `Run` returns nothing, so failure is not detectable in code. | ⚠️ broadcast verified; **siren path failed** (D-2) |
 | MLRS MIRVs | `rocket_mlrs.prefab` = `MLRSRocket : TimedExplosive, SamSite.ISamSiteTarget`, has `ServerProjectile`; `ProjectileImpact` explodes and broadcasts ground FX; `ServerInit` creates a map marker and broadcasts launch FX. | ✅ verified |
 | Aiming an MIRV | `ServerProjectile.InitializeVelocity(Vector3)` is public; `speed`, `gravityModifier`, `initialVelocity` are public fields. | ✅ verified |
@@ -465,11 +466,19 @@ compiled).
 | Bus prefab spawnable | `nuclear_warhead.prefab` spawns as a plain `BaseEntity` (`Spawn()` OK). Visible geometry unconfirmed — no renderer on the root. | ✅ spawns; ⚠️ visuals (R8) |
 | CCTV on a moving parent | `CCTV_RC` exists (`cctv.static`, `cctv_deployed`); parenting to a moving entity and keeping the feed alive is **unverified**. | ⚠️ probe R2 |
 | CCTV discovery | A station only auto-gathers **static** cameras within `autoGatherRadius`; anything else must be added by identifier (`ForceAddBookmark`). Confirmed in `ComputerStation.GatherStaticCameras`. | ✅ verified |
+| Siren via effect route | With the correct path there is **no** pool error, but the siren was **not audible at 1 m or 2000 m** (R4 run 2). The effect route does not produce audible sound for this asset. | ❌ R6 effect route rejected; R6b entity route is the test |
 | Vanilla MLRS map marker is private | `MapMarkerMLRSRocket.ShouldNetworkTo` returns `player.userID == OwnerID` and `limitNetworking = true`: the marker is visible **only to the rocket's owner**, never to the server. Six vanilla markers cannot be shown to everyone. | ✅ verified — changes FR-29/FR-44 |
 | Generic map marker | `genericradiusmarker.prefab` = `MapMarkerGenericRadius` with public `radius`, `color1`, `color2`, `alpha` and `SendUpdate()`; no `ShouldNetworkTo` override, so it is not owner-limited. | ✅ verified (visibility still needs R7) |
 | `oilfireball2` is an entity | `oilfireball2.prefab` = `FireBall : BaseEntity` — `damagePerSecond = 2`, `radius = 0.5`, life 20–40 s, spreads fire. Spawns and parents (R9 run 1); neutering applied; look/spread not yet reported. | ⚠️ probe R9 |
 | Debug drawing | `ddraw.line/arrow/sphere/text/box` via `SendConsoleCommand` (duration + colour). | ✅ verified pattern |
-| Clearing debug drawing | `ddraw.clear` — **not verified**. | ⚠️ probe R3 |
+| Clearing debug drawing | `ddraw.clear` clears the lines correctly on the operator's client (run 2). | ✅ verified |
+| Supply signal smoke | `SupplySignal.Explode` sets `Flags.On` and sends a network update; `smokeEffectPrefab` is referenced but not used in this file. Run 2's probe **killed** the signal, which removed the smoke. The R5 prefix must replicate the flag and network update without the plane. | ⚠️ R5 v2 |
+| Cargo plane suppression | Run 2: intercept fired; no plane seen after several minutes. | ✅ verified (plane); smoke pending |
+| CCTV identifier | `CCTV_RC` inherits from `PoweredRemoteControlEntity`; its identifier source is not in the decompile. Run 2: our camera reported `COBALT1`, and a station with that identifier opened a **large oil-rig camera**. Identifiers are probably not unique. | ❌ R2 v2 (duplicate survey) |
+| Marker radius units | `genericradiusmarker` at `radius = 60` tinted the **whole map** pink (run 2). Radius is not metres on the client. | ❌ R7 sweep |
+| FireBall plume neutering | Setting `spreadSubEntity = null` causes a `NullReferenceException` in `FireBall.TryToSpread` (run 2). Setting `generation = 1000` short-circuits the spread test instead. | ✅ fix in v0.3, to verify |
+| Bus visible | `nuclear_warhead.prefab` renders (run 2). | ✅ verified |
+| Vanilla MLRS map marker is private |
 
 ### 9.2 Proposed architecture
 
@@ -508,6 +517,7 @@ Rules:
 | R7 | Reload mid-flight. | Orphans, stuck cameras. | Recovery scan on load; `Cleanup` on unload; abort command. |
 | R8 | Prefab path changes after a Rust update. | Silent no-show. | Validate all prefabs at load; refuse to arm and log loudly. |
 | R9 | `nuclear_warhead.prefab` spawns but may have no visible geometry. | The bus is invisible. | Check visually (R8); fallback is a carrier entity with a visible child. |
+| R11 | Supply-signal smoke is lost when the probe kills the signal (run 2). | The target is not painted pink, breaking FR-10. | R5 v2 keeps `Flags.On` and the network update, and skips only the plane. |
 | R10 | Safe zones nullify the strike (vanilla rockets self-destruct on `TriggerSafeZone`, damage is blocked). | Q10's "real consequences" may not happen. | Verify in R10; decide between fizzle / deflection / bespoke handling (Q17). |
 
 ### 9.4 FX research pass (required before M5)
@@ -539,7 +549,7 @@ if a required prefab is missing.
 | Booster plumes ×4 | `Visuals.BoosterNozzleEffect` | ✅ given | `assets/prefabs/npc/m2bradley/oilfireball2.prefab` — a `FireBall` entity, needs neutering (R9) |
 | Water-exit cue | `Visuals.WaterExitEffect` | ✅ given | `assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab` |
 | Separation flash | `Visuals.SeparationEffect` | ❌ TBD | Operator left this to us: pick during the FX pass (§9.4). |
-| Air-raid siren | `Sirens.Effect` | ✅ given | `assets/bundled/prefabs/modding/sound/air_raid/airraidsound.prefab` |
+| Air-raid siren | `Sirens.Effect` | ✅ given | `assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab` |
 | Target smoke | `Visuals.TargetSmokeEffect` | ❌ TBD | Pink/purple smoke (Q13). |
 | Map marker | `Marker.Prefab` | ✅ chosen | `assets/prefabs/tools/map/genericradiusmarker.prefab` |
 | Nuke FX layers | `Blast.EffectPrefabs` | ⏳ FX pass | Q7 = C: research pass before choosing. |
@@ -619,7 +629,11 @@ Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_P
 | Q16 | Confirm the marker approach: purple `genericradiusmarker` instead of a tiny MLRS rocket? | The rocket-marker idea cannot work server-wide (owner-only networking). | Purple radius marker on the missile and on each MIRV. |
 | Q17 | What does "real consequences" mean for a safe zone hit? Vanilla rockets self-destruct on safe-zone triggers and damage is blocked. | Decides whether a strike on Outpost/Bandit actually does anything. | Strike fizzles inside the safe-zone volume; log it and warn the caller. |
 | Q18 | Are the six MIRV markers allowed to be *ship-sized* circles, or should they read as small dots? | Visual taste. | Small (8 m) dots. |
-| Q19 | Siren route (D-2): spawn the air-raid asset as an entity (R6b), or audition vanilla pooled effects? | Q2 as written cannot play the asset. | R6b first. |
+| Q19 | Siren route (D-2): spawn the air-raid asset as an entity (R6b), or audition vanilla pooled effects? | Effect route is silent (R4 run 2). | R6b first. |
+| Q22 | Does the R6b siren entity make sound at 1 m and at 1900 m? | Decides Q2 and FR-14/15. | Unknown until R6b. |
+| Q23 | Is R7's map tint at radius 60 the correct size, or should the radius be in other units? | Decides marker sizes in §7.1. | Unknown until R7 sweep. |
+| Q24 | Do the R2 survey results show duplicate identifiers on the server? | Decides whether we must assign our own identifiers. | Unknown until R2 survey. |
+| Q25 | Smoke: after R5 v2, does the target show the smoke colour we need? | FR-10 and Q13. | Unknown until R5 v2. |
 | Q20 | Missile carrier (D-1): accept an invisible carrier entity with the missile prefab as a child? | Architecture of M3. | Yes. |
 | Q21 | Did `/probe bus` show anything 8 m in front (R8)? | Decides whether the bus needs a visible child. | Assume not visible until confirmed. |
 
@@ -672,7 +686,7 @@ amended if reality disagreed.
 | Version | Date | Change | By |
 |---|---|---|---|
 | 0.1 | 2026-10-17 | Initial framework: storyboard, FRs, config sketch, feasibility probes, open questions. | Build agent |
-| 0.2 | 2026-10-17 | Operator answers recorded (Q1–Q12). Probe run 1: missile not an entity (R1), siren not playable via effects (R6), bus spawns (R8), supply intercept works (R5). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
+| 0.2 | 2026-10-17 | Probe run 2: siren path corrected (`air raid`); R3, R8, R5 plane confirmed; R2 identifier duplicates; R7 marker tinted the whole map; R9 plumes need the `generation` neutering. Operator answers recorded (Q1–Q12). Probe run 1: missile not an entity (R1), siren not playable via effects (R6), bus spawns (R8), supply intercept works (R5). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
 
 ---
 
