@@ -479,6 +479,7 @@ compiled).
 | CCTV identifier | `rcIdentifier` is a public field. `PoweredRemoteControlEntity.Spawn()` replaces a `#ID` token with the net id when the entity is static (verified source). Default `COBALT1` is shared by **32** monument cameras (run 4). Fix: `rcIdentifier = "NUKECAM#ID"` before `Spawn()`. `ComputerStation.IsValidIdentifier`: alphanumeric, ≤ 32 characters. | ✅ mechanism verified; ⚠️ run 5 to confirm |
 | Marker radius units | Run 2: radius 60 tinted the whole map. Run 4: radius 25 tinted the whole map; radius 5 was "fairly large". Radius is not metres on the client. | ❌ R7 sweep (0.5–5) in v0.4 |
 | FireBall plume neutering | Setting `spreadSubEntity = null` causes a `NullReferenceException` in `FireBall.TryToSpread` (run 2). Setting `generation = 1000` short-circuits the spread test instead. | ✅ fix in v0.3, to verify |
+| Missile body via carrier | Silo missile is not an entity (R1). A server-side child of a carrier does **not** replicate, so a carrier only helps if a networked prefab already contains the model. Probe R1b tests this and audits the warhead's model. Options A/B/C in M0_PROBES Part E. | ⚠️ R1b pending — **blocks M3 visual** |
 | Bus visible | `nuclear_warhead.prefab` renders (run 2). | ✅ verified |
 | Vanilla MLRS map marker is private |
 
@@ -519,6 +520,7 @@ Rules:
 | R7 | Reload mid-flight. | Orphans, stuck cameras. | Recovery scan on load; `Cleanup` on unload; abort command. |
 | R8 | Prefab path changes after a Rust update. | Silent no-show. | Validate all prefabs at load; refuse to arm and log loudly. |
 | R9 | `nuclear_warhead.prefab` spawns but may have no visible geometry. | The bus is invisible. | Check visually (R8); fallback is a carrier entity with a visible child. |
+| R12 | **Missile body cannot be networked as a child of a carrier** (server-side children do not replicate). | The booster is not the silo missile unless a networked prefab already carries it. | Probe R1b; decision among options A/B/C (M0_PROBES Part E). |
 | R11 | Supply-signal smoke is lost when the probe kills the signal (run 2). | The target is not painted pink, breaking FR-10. | R5 v2 keeps `Flags.On` and the network update, and skips only the plane. |
 | R10 | Safe zones nullify the strike (vanilla rockets self-destruct on `TriggerSafeZone`, damage is blocked). | Q10's "real consequences" may not happen. | Verify in R10; decide between fizzle / deflection / bespoke handling (Q17). |
 

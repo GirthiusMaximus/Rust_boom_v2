@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.4.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.5.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -13,7 +13,7 @@
 //   /probe <ID> end [observation...]   end it: your observation is logged, cleanup runs
 //   /probe abort                       end whatever is running, with cleanup
 //   /probe status | /probe help
-// IDs: R0 R1 R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -36,11 +36,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.4.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.5.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.4.0";
+    private const string Version = "0.5.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -51,8 +51,10 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const string CctvPrefab = "assets/prefabs/deployable/cctvcamera/cctv.static.prefab";
     private const string MarkerPrefab = "assets/prefabs/tools/map/genericradiusmarker.prefab";
     private const string PlumePrefab = "assets/prefabs/npc/m2bradley/oilfireball2.prefab";
+    // Bare networked entity (BaseEntity only, per Entities.md). Used as an invisible carrier in R1b.
+    private const string CarrierPrefab = "assets/content/structures/rocket_crane/rocket_crane_lift_trigger.prefab";
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b" };
     private static readonly float[] MarkerRadii = { 0.5f, 1f, 2f, 3f, 5f };
 
     private static TheatricalNukeProbe _instance;
@@ -213,6 +215,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R6": ProbeR6(run, op); break;
                 case "R6b": ProbeR6b(run, op); break;
                 case "R6c": ProbeR6c(run, op); break;
+                case "R1b": ProbeR1b(run, op); break;
                 case "R7": ProbeR7(run, op); break;
                 case "R8": ProbeR8(run, op); break;
                 case "R9": ProbeR9(run, op); break;
@@ -801,6 +804,94 @@ public class TheatricalNukeProbe : CarbonPlugin
                 try { Line(run, "AUDIT", $"      prop {pr.Name} = {Convert.ToString(pr.GetValue(c, null))}"); }
                 catch (Exception ex) { Line(run, "AUDIT", $"      prop {pr.Name} threw {ex.GetType().Name}"); }
             }
+        }
+    }
+
+    // ── R1b: can a visible missile body ride on an invisible networked entity? ─────────────────
+    // A non-entity GameObject (the silo missile) cannot be networked on its own. This probe:
+    //  1. audits the missile and the nuclear_warhead entity: child names, mesh names, materials;
+    //  2. spawns a bare networked entity as the carrier (rocket_crane_lift_trigger: BaseEntity only);
+    //  3. instantiates a SERVER-SIDE copy of the missile under the carrier.
+    // Expected: clients do NOT see step 3, because only entities and their prefab children replicate.
+    private void ProbeR1b(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 180f;
+
+        var missile = GameManager.server.FindPrefab(MissilePrefab);
+        if (missile == null)
+        {
+            Line(run, "RESULT", "FindPrefab null for the missile");
+            return;
+        }
+
+        AuditVisuals(run, missile, "missile prefab");
+
+        var warhead = GameManager.server.FindPrefab(BusPrefab);
+        if (warhead != null) AuditVisuals(run, warhead, "nuclear_warhead entity prefab");
+
+        var carrierPos = InFront(p, 14f, 1f);
+        var carrier = GameManager.server.CreateEntity(CarrierPrefab, carrierPos, Quaternion.identity);
+        if (carrier == null)
+        {
+            Line(run, "RESULT", $"carrier CreateEntity returned null for {CarrierPrefab}");
+            return;
+        }
+
+        carrier.Spawn();
+        Track(run, carrier, "carrier entity");
+        Line(run, "STEP", $"carrier {carrier.GetType().Name} spawned at {Pos(carrierPos)} (net id {(carrier.net != null ? carrier.net.ID : 0u)})");
+        AuditComponents(run, carrier.gameObject, "carrier live");
+
+        GameObject visual = null;
+        try
+        {
+            visual = UnityEngine.Object.Instantiate(missile, carrier.transform);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
+            Line(run, "STEP", $"server-side missile copy created under the carrier '{carrier.transform.name}'");
+        }
+        catch (Exception ex)
+        {
+            Line(run, "STEP", $"Instantiate threw {ex.GetType().Name}: {ex.Message}");
+        }
+
+        if (visual != null)
+        {
+            run.Cleanup.Add(new CleanupItem
+            {
+                Label = "destroy server-side missile copy",
+                Run = () =>
+                {
+                    UnityEngine.Object.Destroy(visual);
+                    return "destroyed";
+                },
+            });
+        }
+
+        Line(run, "RESULT", "Operator: stand 30 m away, look 14 m in front of you at about 1 m height. " +
+                            "Report whether you see the missile body. Expected: NO. Then /probe R1b end <observation>.");
+    }
+
+    // Lists transforms with their mesh and material names, so visuals can be compared between prefabs.
+    private void AuditVisuals(ProbeRun run, GameObject root, string label)
+    {
+        var transforms = root.GetComponentsInChildren<Transform>(true);
+        Line(run, "AUDIT", $"{label}: {transforms.Length} transform(s) under '{root.name}'");
+
+        foreach (var t in transforms)
+        {
+            var comps = t.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name).ToArray();
+            var meshText = string.Empty;
+
+            foreach (var c in t.GetComponents<Component>())
+            {
+                if (c == null) continue;
+                var typeName = c.GetType().Name;
+                if (typeName == "MeshFilter") meshText += " mesh=" + Reflect(c, "sharedMesh");
+                else if (typeName == "MeshRenderer" || typeName == "SkinnedMeshRenderer") meshText += " material=" + Reflect(c, "sharedMaterial");
+            }
+
+            Line(run, "AUDIT", $"  '{t.name}' active={t.gameObject.activeInHierarchy} [{string.Join(", ", comps)}]{meshText}");
         }
     }
 

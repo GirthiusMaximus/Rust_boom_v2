@@ -441,3 +441,24 @@ Carbon could not resolve `AudioSource` (it lives in `UnityEngine.AudioModule`, w
 | **R9** | Plumes spawned on top of the operator again. Not judgeable. | ❌ spawn 5 m in front, log positions before and after `SetParent`, compare static and follow modes. |
 
 **Q3 (smoke life):** the operator's answer is **15 s**. Configured as `Visuals.SmokeSeconds`, not hard-coded. The vanilla value is 210 s.
+
+
+### Missile body — carrier question (raised by operator, run 5 planning)
+
+The silo missile (`nuclear_silo_missile.prefab`) is not an entity (R1, run 1). The design planned an
+invisible carrier entity with the missile as a child. That needs a second check: **a server-side
+child is not networked.** Only entities and the children of their prefabs reach clients. So the
+carrier only helps if the **client-side prefab of a networked entity already contains the missile
+model**.
+
+**Probe R1b** tests this in one run:
+1. Audits the missile and `nuclear_warhead` entity: child names, mesh names, materials. If the warhead
+   shares the silo mesh, that is the answer.
+2. Spawns a bare networked carrier (`rocket_crane_lift_trigger.prefab`, BaseEntity only, per the index).
+3. Instantiates a server-side copy of the missile under the carrier.
+4. Operator reports whether the body is visible 14 m away. **Expected: not visible.**
+
+If R1b confirms invisibility, the options are:
+- **A.** Use a networked entity whose prefab already shows a missile-like model (audit result decides).
+- **B.** Use a visible vanilla rocket entity (`rocket_basic`, `rocket_hv`, `rocket_fire`) as the body. Not MLRS, but still a generic rocket, so the theatre is weaker.
+- **C.** Ship a client content bundle with the missile. Rejected by the server-only rule (no client mods). Needs an explicit decision to relax it.
