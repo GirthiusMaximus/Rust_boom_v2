@@ -689,3 +689,12 @@ Position used for runs 8 to 11: operator about (-2065 to -2068, 15.5 to 16.2, 45
 - No tested route has produced a movable, visible silo missile. The hard requirement for the initial missile (FR-25) is not met.
 
 **Open decision (operator):** whether to close the Harmony and prefab-id route as negative, and how to treat FR-25 while no route works.
+
+## Run 12: R1o and R1t (v0.11.7, operator at (-2066 to -2068, 16.2 to 16.4, 463 to 472))
+
+| Probe | Route | Result | Cleanup |
+|---|---|---|---|
+| R1o | Effect with the silo prefab parented to a networked bus 14 m in front | Operator saw the parent bus spawn, did not see the silo missile. Observation text was truncated in the box: "I saw the missile bus spawn in front of me, however I did not see the". Bus killed at 15 s. | OK |
+| R1t | `GameManager.server.CreateEntity` on the silo prefab path | Returned null. The silo prefab is not a networked entity prefab. Route closed. | OK |
+
+**Open:** R1g `go` and R1h `go` (plain effect, no handle) are not killable and remain blocked by the killability rule. The text truncation in R1o needs a fix before its observation can be trusted.
