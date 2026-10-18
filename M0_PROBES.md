@@ -417,3 +417,14 @@ Listen 8 m away; then walk 200 m, 800 m, 1900 m away and note audibility.
 | R9 | `/probe R9 4` | Four plumes, 4 m apart, damage 0, spread disabled. |
 
 Questions for you: see the chat reply (Q22–Q25).
+
+### Build fix — v0.3 compile error (CS1069)
+
+Carbon could not resolve `AudioSource` (it lives in `UnityEngine.AudioModule`, which is not in the plugin reference set). Fixed by finding `AudioSource` components by type name and reading their properties by reflection. No new assembly reference needed. Re-run R6b to get the audio dump.
+
+### Operator answers (run 3)
+
+- **Q1** (siren plugin debug output): operator is updating their working siren plugin to print more detail. Awaiting its output.
+- **Q2** plume damage: **0** (decided).
+- **Q3** football smoke life: operator answered "15 s". This may refer to the siren delay rather than the smoke. **Needs confirmation** (see chat).
+- **Q4** leftover siren entity: none spawned by the operator. Operator has used `spawnat airraidsound` with success in the past, which suggests the entity route works.

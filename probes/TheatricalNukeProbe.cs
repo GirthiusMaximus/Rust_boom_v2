@@ -3,7 +3,9 @@
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
 // BaseEntity.Flags.On, SendNetworkUpdateImmediate, Invoke(Action,float) inside the R5
-// prefix, UnityEngine.Object.FindObjectsOfType, GetComponentsInChildren<AudioSource>.
+// prefix, UnityEngine.Object.FindObjectsOfType.
+// Compile-checked in run 3: SetFlag, Flags.On, IsStatic() and GetIdentifier() are public.
+// AudioSource is NOT referenced by type (AudioModule is not in the plugin reference set); it is read by reflection.
 // If Carbon reports a compile error, those lines are the first suspects.
 //
 // PROTOCOL (one probe at a time; every probe has its own command):
@@ -361,6 +363,28 @@ public class TheatricalNukeProbe : CarbonPlugin
     private static Vector3 InFront(BasePlayer p, float metres, float up = 0f) =>
         p.transform.position + p.transform.forward * metres + Vector3.up * up;
 
+    // AudioSource lives in UnityEngine.AudioModule, which is not in Carbon's plugin reference set
+    // (compile error CS1069 in run 3). We find AudioSource components by type name and read their
+    // properties by reflection, so no extra assembly reference is needed.
+    private static IEnumerable<Component> AudioComponents(GameObject go)
+    {
+        return go.GetComponentsInChildren<Component>(true)
+            .Where(c => c != null && c.GetType().Name == "AudioSource");
+    }
+
+    private static string Reflect(object target, string property)
+    {
+        try
+        {
+            var p = target.GetType().GetProperty(property);
+            return p == null ? "n/a" : Convert.ToString(p.GetValue(target, null));
+        }
+        catch (Exception ex)
+        {
+            return "err:" + ex.GetType().Name;
+        }
+    }
+
     private void DumpAudio(ProbeRun run, GameObject go, string label)
     {
         if (go == null)
@@ -369,15 +393,15 @@ public class TheatricalNukeProbe : CarbonPlugin
             return;
         }
 
-        var sources = go.GetComponentsInChildren<AudioSource>(true);
-        Line(run, "AUDIO", $"{label}: {sources.Length} AudioSource component(s) on {go.name}");
+        var sources = AudioComponents(go).ToArray();
+        Line(run, "AUDIO", $"{label}: {sources.Length} AudioSource component(s) on {go.name} (reflected)");
 
         foreach (var s in sources)
         {
-            var clip = s.clip != null ? s.clip.name : "none";
             Line(run, "AUDIO",
-                $"  on '{s.gameObject.name}' clip={clip} playOnAwake={s.playOnAwake} loop={s.loop} " +
-                $"volume={s.volume:0.00} minDist={s.minDistance:0} maxDist={s.maxDistance:0} isPlaying={s.isPlaying}");
+                $"  on '{s.gameObject.name}' clip={Reflect(s, "clip")} playOnAwake={Reflect(s, "playOnAwake")} " +
+                $"loop={Reflect(s, "loop")} volume={Reflect(s, "volume")} minDist={Reflect(s, "minDistance")} " +
+                $"maxDist={Reflect(s, "maxDistance")} isPlaying={Reflect(s, "isPlaying")}");
         }
     }
 
@@ -597,7 +621,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             return;
         }
 
-        var playing = entity.gameObject.GetComponentsInChildren<AudioSource>(true).Count(s => s.isPlaying);
+        var playing = AudioComponents(entity.gameObject).Count(s => Reflect(s, "isPlaying") == "True");
         Line(run, "AUDIO", $"{when}: AudioSources currently playing = {playing}");
     }
 
