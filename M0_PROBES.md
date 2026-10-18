@@ -667,3 +667,25 @@ Operator: the effect-route tests (R1g, R1h) are acceptable only if the spawned e
 Not killable: R1g and R1h (plain `Effect.server.Run`, no handle). They remain available only with `go`. Superseded by R1n and R1o for any run that must clean up.
 
 **Run 7 order (revised):** R1i → R1j → R1k (read-only) → R1n (killable, moves) → R1o (killable) → R1g `go` and R1h `go` only if R1n and R1o both fail → R1m.
+
+## Runs 8 to 11: prefab-id and Harmony routes (2026-10-18)
+
+Position used for runs 8 to 11: operator about (-2065 to -2068, 15.5 to 16.2, 458 to 464), yaw 0, bus 8 m in front at about 2 m.
+
+| Probe | Version | Route | Result (operator) | Cleanup |
+|---|---|---|---|---|
+| R8 | v0.11.3 | Networked nuclear warhead bus, control | "The missile bus was visible." | OK |
+| R1n | v0.11.3 | Carbon `ClientEntity`, silo prefab, rise 40 m | "The missile body was not visible to the operator." Client received prefab id 3918629484. | OK |
+| R1q | v0.11.4 | Harmony prefix and postfix on `SendAsSnapshot`; prefab id swapped only during that snapshot | "I saw the bus ... nuclear_warhead.prefab ... this did not however change to intended." Swaps 1, restores 1. | OK |
+| R1r | v0.11.5 | Prefab id set to silo before `Spawn`, no Harmony | Run 10: "did not observe a missle apparing." Run 11: "Missile bus was not visible. Missile body was not visible." | OK |
+| R1s | v0.11.5 | Harmony on `SendAsSnapshot`, `ToStreamForNetwork`, `CanUseNetworkCache`; swap on serialization | Run 10: "did not observe an upright missle appear in any way." Run 11: "Missle bus was not visible. Missile body was not visible either." Counts: snapshot 1, stream 3, cache true 4; swaps 4, restores 4. | OK |
+| R1p | v0.11.3 | Harmony discovery (read-only) | Prefab id field `BaseNetworkable.prefabID`; StringPool id for silo prefab 3918629484. | n/a |
+
+**Findings**
+- R8 shows the networked bus at this spot, so the control works.
+- The silo prefab ID is sent to the client (R1n), but no body appears.
+- Swapping the ID only during one snapshot (R1q) still shows the warhead bus. Setting the silo ID before spawn (R1r) and across all serialization paths (R1s) shows nothing. The client seems to build an empty entity from the silo prefab ID.
+- The only visible silo missile found so far is the monument's own child object at (-2074.21, -19.95, 343.13) to (-2074.76, 16.34, 343.08). It is static and cannot be moved.
+- No tested route has produced a movable, visible silo missile. The hard requirement for the initial missile (FR-25) is not met.
+
+**Open decision (operator):** whether to close the Harmony and prefab-id route as negative, and how to treat FR-25 while no route works.
