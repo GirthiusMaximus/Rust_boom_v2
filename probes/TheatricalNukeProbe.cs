@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.3.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.4.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -17,7 +17,7 @@
 //   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
 //   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.3")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.4")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.3";
+    private const string Version = "0.11.4";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -269,11 +269,11 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
-        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
-        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)");
+        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -437,6 +437,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1g": ProbeR1g(run, op); break;
                 case "R1n": ProbeR1n(run, op); break;
                 case "R1p": ProbeR1p(run, op); break;
+                case "R1q": ProbeR1q(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -1578,7 +1579,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private void ProbeR1p(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 30f;
-        Line(run, "STEP", $"Harmony instance present: {(_harmony != null ? "yes" : "no")}");
+        Line(run, "STEP", $"HarmonyLib type loaded: {(FindType("HarmonyLib.Harmony") != null ? "yes" : "no")}");
 
         var pool = FindType("StringPool");
         var get = pool?.GetMethod("Get", new[] { typeof(string) });
@@ -1607,6 +1608,94 @@ public class TheatricalNukeProbe : CarbonPlugin
         }
 
         Line(run, "RESULT", "Discovery only. No patch installed. Send the DETAIL lines for BaseNetworkable and BaseEntity so the Harmony target can be chosen.");
+    }
+
+    // ── R1q: Harmony swap of the outgoing prefab id on one carrier's snapshot (approved) ───────────
+    // A networked nuclear warhead bus is created, then its prefab id is swapped to the silo missile's id
+    // while it serializes its snapshot (Harmony prefix on BaseNetworkable.SendAsSnapshot). The postfix
+    // restores the bus id straight away. Server-side only; the client's prefab files are unchanged.
+    private const string R1qHarmonyId = HarmonyId + ".r1q";
+    private static FieldInfo _r1qPrefabField;
+    private static uint _r1qSiloId;
+    private static BaseEntity _r1qCarrier;
+    private static bool _r1qArmed;
+    private static int _r1qSwaps, _r1qRestores, _r1qErrors;
+    private Harmony _r1qHarmony;
+
+    private void ProbeR1q(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 30f;
+        _r1qSwaps = 0; _r1qRestores = 0; _r1qErrors = 0;
+        _r1qArmed = false;
+        _r1qCarrier = null;
+
+        var pool = FindType("StringPool");
+        var get = pool?.GetMethod("Get", new[] { typeof(string) });
+        if (get == null) { Line(run, "RESULT", "StringPool.Get(string) not found by reflection. Not run."); return; }
+        _r1qSiloId = (uint)get.Invoke(null, new object[] { MissilePrefab });
+
+        _r1qPrefabField = typeof(BaseNetworkable).GetField("prefabID", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (_r1qPrefabField == null) { Line(run, "RESULT", "BaseNetworkable.prefabID field not found. Not run."); return; }
+
+        var target = typeof(BaseNetworkable)
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+            .FirstOrDefault(m => m.Name == "SendAsSnapshot" && m.GetParameters().Length == 4);
+        if (target == null) { Line(run, "RESULT", "BaseNetworkable.SendAsSnapshot (4 parameters) not found. Not run."); return; }
+
+        var bus = GameManager.server.CreateEntity(BusPrefab, InFront(p, 8f, 2f), Quaternion.identity);
+        if (bus == null) { Line(run, "RESULT", $"CreateEntity returned null for {BusPrefab}. Not run."); return; }
+
+        var originalId = (uint)_r1qPrefabField.GetValue(bus);
+        Line(run, "STEP", $"carrier created {bus.GetType().Name}; bus prefabID={originalId}; swap target silo prefabID={_r1qSiloId}");
+
+        _r1qHarmony = new Harmony(R1qHarmonyId);
+        _r1qHarmony.Patch(target,
+            prefix: new HarmonyMethod(typeof(TheatricalNukeProbe).GetMethod(nameof(R1qPrefix), BindingFlags.NonPublic | BindingFlags.Static)),
+            postfix: new HarmonyMethod(typeof(TheatricalNukeProbe).GetMethod(nameof(R1qPostfix), BindingFlags.NonPublic | BindingFlags.Static)));
+        Line(run, "STEP", "Harmony prefix and postfix applied to BaseNetworkable.SendAsSnapshot");
+
+        _r1qCarrier = bus;
+        _r1qArmed = true;
+        bus.Spawn();
+        Track(run, bus, "r1q carrier bus");
+
+        run.Cleanup.Add(new CleanupItem
+        {
+            Label = "R1q disarm and unpatch",
+            Run = () =>
+            {
+                _r1qArmed = false;
+                _r1qCarrier = null;
+                try { _r1qHarmony?.UnpatchAll(R1qHarmonyId); } catch (Exception) { _r1qErrors++; }
+                return $"unpatched; swaps={_r1qSwaps} restores={_r1qRestores} errors={_r1qErrors}";
+            },
+        });
+
+        Line(run, "RESULT", "Operator: look 8 m in front at about 2 m. Report what appears where the bus was, its height, its shape, and whether it looks like the upright silo missile.");
+    }
+
+    private static void R1qPrefix(BaseNetworkable __instance, ref uint __state)
+    {
+        __state = 0;
+        try
+        {
+            if (!_r1qArmed || __instance == null || !ReferenceEquals(__instance, _r1qCarrier)) return;
+            __state = (uint)_r1qPrefabField.GetValue(__instance);
+            _r1qPrefabField.SetValue(__instance, _r1qSiloId);
+            _r1qSwaps++;
+        }
+        catch (Exception) { _r1qErrors++; }
+    }
+
+    private static void R1qPostfix(BaseNetworkable __instance, uint __state)
+    {
+        try
+        {
+            if (__state == 0 || __instance == null) return;
+            _r1qPrefabField.SetValue(__instance, __state);
+            _r1qRestores++;
+        }
+        catch (Exception) { _r1qErrors++; }
     }
 
     // R1k: every networked entity prefab (manifest.entities), scanned for a child whose name looks like a missile.
