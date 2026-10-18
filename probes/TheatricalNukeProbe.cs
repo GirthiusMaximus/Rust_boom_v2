@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.8.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.9.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -17,7 +17,7 @@
 //   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
 //   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R1c R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1e R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.8.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.9.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.8.0";
+    private const string Version = "0.9.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1f" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -269,10 +269,10 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
-        player.ChatMessage("Probes: R0 R1 R1b R1c R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
-        player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1f (silo parent test)");
+        player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -432,6 +432,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1": ProbeR1(run, op); break;
                 case "R1b": ProbeR1b(run, op); break;
                 case "R1c": ProbeR1c(run, op); break;
+                case "R1e": ProbeR1e(run, op); break;
                 case "R1f": ProbeR1f(run, op); break;
                 case "R2": ProbeR2(run, op); break;
                 case "R3": ProbeR3(run, op); break;
@@ -1512,6 +1513,140 @@ public class TheatricalNukeProbe : CarbonPlugin
                             "Expected: NO. If SCENE listed an in-world silo missile, also go to its position and report whether it is visible there.");
     }
 
+    // ── R1e: child toggle replication on the visible warhead bus ─────────────────────────────────
+    // args: [child name, default nuclear_warhead]. R1f showed the operator MIRV parts on the warhead bus.
+    // This probe spawns that bus 14 m in front and lists every child first. Then, on the server:
+    //   t+10 s  the chosen child is SetActive(false) and the bus gets SendNetworkUpdateImmediate
+    //   t+25 s  the child is SetActive(true) and the bus is updated again
+    // At each step the operator reports whether the view changed. A child that stays visible after
+    // SetActive(false) means the server-side toggle does not replicate to clients.
+    private void ProbeR1e(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 45f;
+        var wanted = run.Args.Length > 0 ? run.Args[0] : "nuclear_warhead";
+        var pos = InFront(p, 14f, 1f);
+
+        var bus = GameManager.server.CreateEntity(BusPrefab, pos, Quaternion.identity);
+        if (bus == null)
+        {
+            Line(run, "RESULT", $"CreateEntity returned null for {BusPrefab}. Probe not run.");
+            return;
+        }
+
+        bus.Spawn();
+        Track(run, bus, "warhead bus");
+        Line(run, "STEP", $"warhead bus spawned at {Pos(pos)} (net id {(bus.net != null ? bus.net.ID : 0u)}); operator dist={Dist(pos, p):0.0} m");
+
+        var transforms = bus.GetComponentsInChildren<Transform>(true);
+        Line(run, "STEP", $"bus hierarchy: {transforms.Length} transform(s) including the root");
+
+        Transform target = null;
+        Transform fallback = null;
+        foreach (var t in transforms)
+        {
+            if (t == null || t == bus.transform) continue;
+
+            var hasRenderer = t.GetComponent<Renderer>() != null;
+            var hasCollider = t.GetComponent<Collider>() != null;
+            Line(run, "CHILD", $"'{t.name}' path={PathUnder(t, bus.transform)} activeSelf={t.gameObject.activeSelf} " +
+                               $"activeInHierarchy={t.gameObject.activeInHierarchy} renderer={hasRenderer} collider={hasCollider} " +
+                               $"local={Pos(t.localPosition)}");
+
+            if (target == null && t.name.Equals(wanted, StringComparison.OrdinalIgnoreCase)) target = t;
+            if (fallback == null && hasCollider) fallback = t;
+        }
+
+        if (target == null)
+        {
+            target = fallback;
+            Line(run, "NOTE", $"no child named '{wanted}'; falling back to the first child with a collider: '{(target != null ? target.name : "none")}'");
+        }
+
+        if (target == null)
+        {
+            Line(run, "RESULT", "No child to toggle. Probe stopped; the bus is cleaned up at end.");
+            return;
+        }
+
+        var original = target.gameObject.activeSelf;
+        var targetName = target.name;
+        var targetPath = PathUnder(target, bus.transform);
+        Line(run, "STEP", $"target '{targetName}' path={targetPath} activeSelf before={original} renderer={target.GetComponent<Renderer>() != null}");
+
+        // Cleanup order is reverse, so this runs before the bus is killed.
+        run.Cleanup.Add(new CleanupItem
+        {
+            Label = "restore child active state",
+            Run = () =>
+            {
+                if (target == null) return "target already null";
+                target.gameObject.SetActive(original);
+                return $"'{targetName}' activeSelf={target.gameObject.activeSelf}";
+            },
+        });
+
+        timer.Once(10f, () => R1eStep(run, p, bus, target, false, "hide"));
+        timer.Once(25f, () => R1eStep(run, p, bus, target, true, "show"));
+        timer.Once(40f, () => R1eStep(run, p, bus, target, true, "final check"));
+
+        Line(run, "RESULT", $"Phase 0 (now): look at the bus 14 m in front, about 1 m high. Report what you see. " +
+                            $"At 10 s the child '{targetName}' is hidden on the server; at 25 s it is shown again.");
+    }
+
+    private void R1eStep(ProbeRun run, BasePlayer p, BaseEntity bus, Transform target, bool on, string phase)
+    {
+        try
+        {
+            if (run.Ended) return;
+
+            if (bus == null || bus.IsDestroyed || target == null)
+            {
+                Line(run, "NOTE", $"R1e {phase}: bus or child is gone; nothing to do");
+                return;
+            }
+
+            if (phase != "final check")
+            {
+                target.gameObject.SetActive(on);
+                bus.SendNetworkUpdateImmediate();
+            }
+
+            Line(run, "STEP", $"R1e {phase}: '{target.name}' activeSelf={target.gameObject.activeSelf} " +
+                              $"activeInHierarchy={target.gameObject.activeInHierarchy} world={Pos(target.position)} " +
+                              $"bus={Pos(bus.transform.position)} net={(bus.net != null ? bus.net.ID : 0u)}");
+
+            if (phase == "hide")
+            {
+                Line(run, "RESULT", $"Phase hide: the child '{target.name}' is now OFF on the server and the bus was updated. Report: did the MIRV view disappear, partly change, or stay the same?");
+            }
+            else if (phase == "show")
+            {
+                Line(run, "RESULT", $"Phase show: the child '{target.name}' is ON again. Report: did the MIRV view come back?");
+            }
+
+            try { p?.ChatMessage($"R1e {phase} step logged. Report what you see in the observation box at the end."); }
+            catch (Exception ex) { ErrorLog(run, "R1e chat", ex); }
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "R1e " + phase, ex);
+        }
+    }
+
+    private static string PathUnder(Transform t, Transform root)
+    {
+        var parts = new List<string>();
+        var cursor = t;
+        var guard = 0;
+        while (cursor != null && cursor != root && guard++ < 64)
+        {
+            parts.Insert(0, cursor.name);
+            cursor = cursor.parent;
+        }
+
+        return string.Join("/", parts);
+    }
+
     // ── R8: bus prefab visibility ────────────────────────────────────────────────────────────────
     private void ProbeR8(ProbeRun run, BasePlayer p)
     {
@@ -1535,9 +1670,11 @@ public class TheatricalNukeProbe : CarbonPlugin
     private void ProbeR9(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 300f;
-        var spacing = ParseFloat(run.Args, 0) ?? 2f;
-        var mode = run.Args.Length > 1 ? run.Args[1].ToLowerInvariant() : "static";
-        var follow = mode == "follow";
+        // Accept the words in any order: "/probe R9 follow", "/probe R9 2 follow" or "/probe R9 2 static".
+        // Run 6 read the mode from the second argument only, so "/probe R9 follow" silently ran static.
+        var follow = run.Args.Any(a => a.Equals("follow", StringComparison.OrdinalIgnoreCase));
+        var spacing = run.Args.Select(a => float.TryParse(a, out var v) ? v : (float?)null).FirstOrDefault(v => v.HasValue) ?? 2f;
+        var mode = follow ? "follow" : "static";
         var centre = InFront(p, 5f, 1f);
 
         Line(run, "STEP", $"mode={(follow ? "follow (parent after spawn)" : "static (not parented)")} spacing={spacing:0.0} m centre={Pos(centre)}");

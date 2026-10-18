@@ -1,0 +1,664 @@
+﻿[14:10:14.338] [SESSION] BANNER   ########## PROBE SESSION START ##########
+[14:10:14.339] [SESSION] INFO     plugin=TheatricalNukeProbe v0.8.0
+[14:10:14.339] [SESSION] INFO     utc=2026-10-18T14:10:14.3387460Z local=2026-10-18 15:10:14 (Europe/London)
+[14:10:14.339] [SESSION] INFO     operator=76561197972272401 'Todd the Wraith' pos=(-2067.61, 4.45, 844.81) yaw=0.0
+[14:10:14.339] [SESSION] INFO     server hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 m
+[14:10:14.340] [SESSION] INFO     players online=1
+[14:10:14.340] [SESSION] PROTOCOL one probe at a time; every probe writes into this file; /probe <ID> end queues the observation; /probe end collects outstanding observations, then closes the session.
+[14:10:19.746] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r1c
+########## PROBE R1c START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:10:19.7480350Z
+[14:10:19.748] [PROBE R1c] DEBUG    raw args: 0 item(s): ''
+[14:10:19.749] [PROBE R1c] ENV      start: utc=2026-10-18T14:10:19.7492890Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:10:19.749] [PROBE R1c] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2067.61, 4.45, 844.81) yaw=0.0 pitch=0.0
+[14:10:19.749] [PROBE R1c] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:10:19.753] [PROBE R1c] SCAN     manifest: 18671 asset path(s), 2408 networked entity path(s)
+[14:10:19.753] [PROBE R1c] SCAN     keywords: nuclear, silo, missile, warhead, icbm, nuke
+[14:10:19.821] [PROBE R1c] SCAN     matches: 118
+[14:10:19.821] [PROBE R1c] MATCH    asset  assets/bundled/prefabs/autospawn/monument/medium/nuclear_missile_silo.prefab
+[14:10:19.821] [PROBE R1c] MATCH    ENTITY assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab
+[14:10:19.822] [PROBE R1c] DETAIL     root 'nuclear_warhead' active=False components=[Transform, BaseEntity]
+[14:10:19.822] [PROBE R1c] DETAIL     child 'nuclear_warhead' active=True [Transform, MeshCollider]
+[14:10:19.823] [PROBE R1c] MATCH    ENTITY assets/bundled/prefabs/modding/events/twitch/nuke_combined.prefab
+[14:10:19.823] [PROBE R1c] DETAIL     root 'nuke_combined' active=False components=[Transform, BaseEntity]
+[14:10:19.823] [PROBE R1c] DETAIL     child 'nuclear_warhead' active=True [Transform, BaseEntity]
+[14:10:19.823] [PROBE R1c] DETAIL     child 'nuclear_warhead' active=True [Transform, MeshCollider, MeshLOD, MeshFilter, MeshRenderer]
+[14:10:19.823] [PROBE R1c] DETAIL     child 'wooden_crate_a' active=True [Transform, BaseEntity]
+[14:10:19.823] [PROBE R1c] DETAIL     child 'wooden_crate_a' active=True [Transform, MeshCollider, SceneToPrefabTag, MeshLOD, MeshFilter, MeshRenderer, RustNavmeshModifierVolume]
+[14:10:19.823] [PROBE R1c] DETAIL     child 'wipe_laptop' active=True [Transform, WipeLaptopEntity]
+[14:10:19.823] [PROBE R1c] DETAIL     child 'WipeLaptop' active=True [Transform, WipeTimerScreen, GameObjectLOD]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'LaptopCollision' active=True [Transform, BoxCollider, BoxCollider, BoxCollider]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'laptopModel' active=True [Transform, LODGroup]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'targComp_LOD0' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'targComp_LOD1' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'targComp_LOD2' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'UIRoot' active=True [RectTransform]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'WorldUI (1)' active=True [RectTransform, Canvas, CanvasGroup]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'ImageLarge' active=False [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.824] [PROBE R1c] DETAIL     child 'BlueprintIcon' active=True [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'TitleText' active=True [RectTransform, CanvasRenderer, Text, Outline]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'TimerText' active=True [RectTransform, CanvasRenderer, Text, Outline]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'Lower Text' active=False [RectTransform, CanvasRenderer, Text, Outline]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'ImageSmall' active=False [RectTransform, CanvasRenderer, RawImage, MoveOverTime]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'Interference' active=False [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'Interference (1)' active=False [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'LowerBackground' active=True [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'UpperBackground' active=True [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.825] [PROBE R1c] DETAIL     child 'WarheadStatusText' active=True [RectTransform, CanvasRenderer, Text, Outline]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'WarheadCountText' active=False [RectTransform, CanvasRenderer, Text, Outline]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'CycleText' active=False [RectTransform, CanvasRenderer, Text, Outline]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'Interference (2)' active=True [RectTransform, CanvasRenderer, RawImage]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'warhead_cable_single' active=True [Transform, BaseEntity]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'nuclear_warhead_cables_nms_twitch_rivals' active=True [Transform, LODGroup]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'nuclear_warhead_cables_nms_twitch_rivals_LOD0' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'nuclear_warhead_cables_nms_twitch_rivals_LOD1' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'nuclear_warhead_cables_nms_twitch_rivals_LOD2' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.826] [PROBE R1c] DETAIL     child 'nuclear_warhead_cables_nms_twitch_rivals_LOD3' active=True [Transform, MeshFilter, MeshRenderer]
+[14:10:19.827] [PROBE R1c] MATCH    ENTITY assets/bundled/prefabs/modding/events/twitch/warhead_cable_single.prefab
+[14:10:19.827] [PROBE R1c] DETAIL     root 'warhead_cable_single' active=False components=[Transform, BaseEntity]
+[14:10:19.827] [PROBE R1c] MATCH    ENTITY assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab
+[14:10:19.827] [PROBE R1c] DETAIL     root 'door.hinged.bunker.door_nuclear_silo' active=False components=[Transform, Door, Model]
+[14:10:19.827] [PROBE R1c] DETAIL     child 'skin' active=True [Transform, Animator]
+[14:10:19.827] [PROBE R1c] DETAIL     child 'root' active=True [Transform]
+[14:10:19.827] [PROBE R1c] DETAIL     child 'hinge' active=True [Transform, BoxCollider]
+[14:10:19.827] [PROBE R1c] DETAIL     child 'handle' active=True [Transform]
+[14:10:19.827] [PROBE R1c] DETAIL     child 'hatch' active=True [Transform]
+[14:10:19.827] [PROBE R1c] DETAIL     child 'lock' active=True [Transform]
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/effects/explosions/nukedistant/nukedistant.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/effects/explosions/nukedistant/nukedistant_unscaled.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/props/light_fixtures/v2/radtown work prefabs/nuclear missile silo lighting top.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/props/light_fixtures/v2/radtown work prefabs/nuclear missile silo lighting.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/props/light_fixtures/v2/radtown work prefabs/nuclear_missile_silo_fx.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/props/nuclear_warhead/nuclear_warhead.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/props/nuclear_warhead/nuclear_warhead_cables_nms.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/props/nuclear_warhead/nuclear_warhead_cables_nms_twitch_rivals.prefab
+[14:10:19.828] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-elevator-door-close-end.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-elevator-door-close-start.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-elevator-door-open-end.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-elevator-door-open-start.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-hatch-close-end.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-hatch-close-start.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-hatch-open-end.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/effects/nuclear-missile-silo-hatch-open-start.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/sound/monuments/nuclearmissilesilo/nuclear-missile-silo-audio.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/structures/industrial_structures/silo_a.prefab
+[14:10:19.829] [PROBE R1c] MATCH    asset  assets/content/structures/industrial_structures/silo_b.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/industrial_structures/silo_beak.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/industrial_structures/silo_c.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_missile_shilo_elevator_shaft_a.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_missile_shilo_elevator_shaft_b.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_missile_shilo_elevator_shaft_c.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_bunker_hatch.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_light_mount.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_pipe_a.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_pipe_b.prefab
+[14:10:19.830] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_platform_a.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_platform_b.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_platform_hinge.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_vent_a.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_vent_b.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_vent_c.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_vent_d.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_chute_walls.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab
+[14:10:19.831] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_rocket_support.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_a.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_b.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_c.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_d.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_e.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_f.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_g.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_h.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_i.prefab
+[14:10:19.832] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_j.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_k.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_l.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_m.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_n.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_o.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_room_p.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_computer_room.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_control_room.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_infirmary.prefab
+[14:10:19.833] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_level_0.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_level_1.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_level_2.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_level_3.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_level_4.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_level_5.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_office.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_text_sleeping_quarters.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_300x450_crn_a.prefab
+[14:10:19.834] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_300x450_crn_b.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_300x600_b.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_300x600_end.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_300x600_end_mirr.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_300x900_stairs.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_exit.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_exit_garage.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/nuclear_missile_silo/nuclear_silo_tunnel_tube_a.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/portacabin_buildings/prefabs/nuclear_missile_silo_portacabin_building_1200_1800_a.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/portacabin_buildings/prefabs/nuclear_missile_silo_portacabin_building_300_900_a.prefab
+[14:10:19.835] [PROBE R1c] MATCH    asset  assets/content/structures/portacabin_buildings/prefabs/nuclear_missile_silo_portacabin_building_600_900_a.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/content/structures/portacabin_buildings/prefabs/nuclear_missile_silo_portacabin_building_900_1200_a.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/content/structures/portacabin_buildings/prefabs/nuclear_missile_silo_portacabin_building_900_1200_b.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/content/structures/rocket_factory_silo/rocket_factory_silo.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/content/vehicles/attackhelicopter/ahmissilepod.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/prefabs/ammo/rocket/homingmissile.worldmodel.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/effects/attack.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/effects/pfx_manpad_explosion.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/effects/pfx_manpad_launcher_attack.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/effects/pfx_manpad_rocket.prefab
+[14:10:19.836] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/hmlmissile.prefab
+[14:10:19.837] [PROBE R1c] MATCH    ENTITY assets/prefabs/weapons/homingmissilelauncher/homing_missile_launcher.entity.prefab
+[14:10:19.837] [PROBE R1c] DETAIL     root 'homing_missile_launcher.entity' active=False components=[Transform, LockOnLauncher]
+[14:10:19.837] [PROBE R1c] DETAIL     child 'w_HomingMissileLauncher' active=True [Transform]
+[14:10:19.837] [PROBE R1c] DETAIL     child 'Charm' active=True [Transform]
+[14:10:19.837] [PROBE R1c] DETAIL     child 'v_CharmAnchor' active=False [Transform, ViewModelRenderer]
+[14:10:19.837] [PROBE R1c] DETAIL     child 'Audio' active=True [Transform]
+[14:10:19.837] [PROBE R1c] DETAIL     child 'ParticleRoot' active=True [Transform]
+[14:10:19.837] [PROBE R1c] DETAIL     child 'GameObject' active=True [Transform]
+[14:10:19.837] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/homing_missile_launcher.item.prefab
+[14:10:19.838] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/homing_missile_launcher.viewmodel.prefab
+[14:10:19.838] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/homing_missile_launcher.worldmodel.prefab
+[14:10:19.838] [PROBE R1c] MATCH    ENTITY assets/prefabs/weapons/homingmissilelauncher/seekertestentity/seekertest.prefab
+[14:10:19.838] [PROBE R1c] DETAIL     root 'seekertest' active=False components=[Transform, SeekerTest, BoxCollider]
+[14:10:19.838] [PROBE R1c] DETAIL     child 'patrol_helicopter' active=True [Transform]
+[14:10:19.838] [PROBE R1c] DETAIL     child 'w_patrol_helicopter_body' active=True [Transform]
+[14:10:19.838] [PROBE R1c] DETAIL     child 'gun_left_yaw' active=True [Transform]
+[14:10:19.838] [PROBE R1c] DETAIL     child 'gun_left' active=True [Transform]
+[14:10:19.838] [PROBE R1c] DETAIL     child 'gun_left_muzzle' active=True [Transform]
+[14:10:19.839] [PROBE R1c] DETAIL     child 'gun_right_yaw' active=True [Transform]
+[14:10:19.839] [PROBE R1c] DETAIL     child 'gun_right' active=True [Transform]
+[14:10:19.839] [PROBE R1c] DETAIL     child 'gun_right_muzzle' active=True [Transform]
+[14:10:19.839] [PROBE R1c] DETAIL     child 'FlareSpawn' active=True [Transform]
+[14:10:19.839] [PROBE R1c] DETAIL     child 'PFX_Flares_AttackHelicopter' active=True [Transform, ParticleSystemContainer]
+[14:10:19.839] [PROBE R1c] DETAIL     child 'Warning' active=True [Transform]
+[14:10:19.839] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/ui.dialog.homingmissilelauncher.prefab
+[14:10:19.839] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/v_homing_missile_launcher.prefab
+[14:10:19.839] [PROBE R1c] MATCH    asset  assets/prefabs/weapons/homingmissilelauncher/w_homing_missile_launcher.prefab
+[14:10:19.839] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/door.hinged.nms_hatch.icon.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nms_hlod.prefab
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/alphatexture.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/biometexture.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/blendtexture.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/heighttexture.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/normaltexture.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/splattexture0.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/splattexture1.png
+[14:10:19.840] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/topologytexture.png
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo/watertexture.png
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo_ai.prefab
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo_fencenavmeshobstacles.prefab
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo_root_lods/nuclear_missile_silo_root_hlod_albedo.png
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo_root_lods/nuclear_missile_silo_root_hlod_normals.png
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/nuclear_missile_silo_root_lods/nuclear_missile_silo_root_hlod_specular.png
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/puzzle_security.prefab
+[14:10:19.841] [PROBE R1c] MATCH    asset  assets/scenes/prefabs/nuclear missile silo/rocks.prefab
+[14:10:19.841] [PROBE R1c] RESULT   118 match(es), 6 networked entity prefab(s). Read the ENTITY lines and their child names. A child named like the missile on an entity is the lead to test.
+[14:10:24.848] [PROBE R1c] TICK     #1 t=+5.1s operator=(-2067.61, 4.45, 844.81) yaw=0.0
+[14:10:29.850] [PROBE R1c] TICK     #2 t=+10.1s operator=(-2067.61, 4.45, 844.81) yaw=0.0
+[14:10:34.852] [PROBE R1c] TICK     #3 t=+15.1s operator=(-2067.61, 4.45, 844.81) yaw=0.0
+[14:10:39.861] [PROBE R1c] TICK     #4 t=+20.1s operator=(-2067.61, 4.45, 844.81) yaw=0.0
+[14:10:42.480] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r1c | end
+[14:10:42.481] [PROBE R1c] ENV      end: utc=2026-10-18T14:10:42.4811280Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:10:42.481] [PROBE R1c] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2067.61, 4.45, 844.81) yaw=0.0 pitch=0.0
+[14:10:42.481] [PROBE R1c] ENV      end: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:10:42.481] [PROBE R1c] DEBUG    cleanup starting: 0 item(s), reverse order
+########## PROBE R1c END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:10:42.482] [PROBE R1c] PENDING  no observation yet. Queued for collection by /probe end.
+[14:10:42.483] [SESSION] BOX      observation box opened for R1c (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:10:56.123] [SESSION] BOX      input field sent text: words=2 characters=16
+[14:10:56.281] [SESSION] BOX      submit pressed: stored words=2 characters=16
+[14:10:56.282] [SESSION] BOX      observation box closed: submitted
+[14:10:56.282] [SESSION] COLLECT  R1c observation via observation box: words=2 characters=16
+[14:10:56.282] [PROBE R1c] OBSERVE  No observations.
+########## PROBE R1c END ########## outcome=ended by operator; cleanup=OK; duration=36.5s; observation=yes; results=1
+[14:11:20.852] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r1f
+########## PROBE R1f START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:11:20.8527970Z
+[14:11:20.852] [PROBE R1f] DEBUG    raw args: 0 item(s): ''
+[14:11:20.853] [PROBE R1f] ENV      start: utc=2026-10-18T14:11:20.8530610Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:11:20.853] [PROBE R1f] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2067.61, 4.45, 844.81) yaw=0.0 pitch=0.0
+[14:11:20.853] [PROBE R1f] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:11:21.274] [PROBE R1f] SCENE    'w_HomingMissileLauncher' pos=(0.00, 0.00, 0.00) dist=2233.5 m activeSelf=True activeInHierarchy=True parent='assets/prefabs/weapons/homingmissilelauncher/homing_missile_launcher.entity.prefab'
+[14:11:21.274] [PROBE R1f] SCENE    'assets/prefabs/weapons/homingmissilelauncher/homing_missile_launcher.entity.prefab' pos=(0.00, 0.00, 0.00) dist=2233.5 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.497] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2058.28, -16.34, 343.15) dist=502.2 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.501] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2091.00, 7.66, 343.15) dist=502.2 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.507] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2020.65, -16.34, 328.26) dist=519.1 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.508] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2067.15, -16.34, 343.15) dist=502.1 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.508] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2082.28, -7.34, 343.15) dist=502.0 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.510] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2091.03, -7.34, 343.15) dist=502.3 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.511] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2074.65, -16.34, 335.66) dist=509.6 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.512] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2058.28, -7.34, 343.15) dist=501.9 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.514] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2082.28, 7.66, 343.15) dist=501.9 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.517] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2020.65, -16.34, 337.15) dist=510.2 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.518] [PROBE R1f] SCENE    'assets/bundled/prefabs/static/door.hinged.bunker.door_nuclear_silo.prefab' pos=(-2067.16, -7.34, 343.15) dist=501.8 m activeSelf=True activeInHierarchy=True parent='none'
+[14:11:21.627] [PROBE R1f] SCENE    'silo_c (1)' pos=(1981.22, 20.61, -1307.60) dist=4585.4 m activeSelf=True activeInHierarchy=True parent='assets/bundled/prefabs/autospawn/monument/medium/junkyard_1.prefab'
+[14:11:21.627] [PROBE R1f] SCENE    'silo_c' pos=(1950.12, 15.22, -1357.50) dist=4581.7 m activeSelf=True activeInHierarchy=True parent='assets/bundled/prefabs/autospawn/monument/medium/junkyard_1.prefab'
+[14:11:21.627] [PROBE R1f] SCENE    'silo_a' pos=(1915.38, 12.96, -1349.80) dist=4547.6 m activeSelf=True activeInHierarchy=True parent='assets/bundled/prefabs/autospawn/monument/medium/junkyard_1.prefab'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_tunnel_exit' pos=(-2038.65, 7.60, 331.15) dist=514.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_room_j' pos=(-2037.15, 12.10, 317.90) dist=527.8 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x600_crn (5)' pos=(-2038.65, 7.60, 331.15) dist=514.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x900_stairs (3)' pos=(-2035.65, 7.60, 334.15) dist=511.7 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_room_g (4)' pos=(-2019.15, 4.60, 348.15) dist=499.0 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_room_g (3)' pos=(-2022.15, 4.60, 348.15) dist=498.7 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.629] [PROBE R1f] SCENE    'nuclear_silo_room_e' pos=(-2026.65, 4.60, 334.15) dist=512.3 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.630] [PROBE R1f] SCENE    'nuclear_silo_room_h (3)' pos=(-2015.65, 4.60, 333.15) dist=514.3 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.630] [PROBE R1f] SCENE    'nuclear_missile_shilo_elevator_shaft_c' pos=(-2016.15, -7.40, 343.15) dist=504.4 m activeSelf=True activeInHierarchy=True parent='Elevator_2'
+[14:11:21.630] [PROBE R1f] SCENE    'nuclear_silo_room_l' pos=(-2022.15, -7.40, 348.15) dist=498.9 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.630] [PROBE R1f] SCENE    'nuclear_silo_room_g (1)' pos=(-2025.65, -7.40, 335.15) dist=511.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.630] [PROBE R1f] SCENE    'nuclear_silo_room_k' pos=(-2025.65, -7.40, 347.15) dist=499.6 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.630] [PROBE R1f] SCENE    'nuclear_silo_room_o' pos=(-2014.65, -7.40, 334.15) dist=513.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x900_stairs (4)' pos=(-2014.65, -7.40, 334.15) dist=513.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x600_crn (6)' pos=(-2005.65, -10.40, 334.15) dist=514.6 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_room_h (2)' pos=(-2000.65, -10.40, 324.65) dist=524.7 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_room_h (4)' pos=(-2008.15, -10.40, 323.15) dist=525.2 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_room_d' pos=(-2014.65, -10.40, 322.15) dist=525.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x900_stairs (7)' pos=(-2014.65, -10.40, 322.15) dist=525.5 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.631] [PROBE R1f] SCENE    'nuclear_silo_room_f (3)' pos=(-2016.15, -13.40, 308.15) dist=539.4 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.632] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x600_crn (3)' pos=(-2017.65, -13.40, 310.15) dist=537.3 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.632] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x450_crn_b (1)' pos=(-2014.65, -13.40, 313.15) dist=534.6 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.632] [PROBE R1f] SCENE    'nuclear_silo_tunnel_tube_a (5)' pos=(-2020.65, -16.40, 337.15) dist=510.3 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.632] [PROBE R1f] SCENE    'nuclear_silo_tunnel_300x900_stairs (6)' pos=(-2020.65, -13.40, 313.15) dist=534.0 m activeSelf=True activeInHierarchy=True parent='Props'
+[14:11:21.710] [PROBE R1f] SCENE    scanned 581464 transform(s); matches=225 (first 40 listed)
+[14:11:21.711] [PROBE R1f] STEP     networked parent BaseEntity spawned at (-2067.61, 6.45, 858.81) (net id 8116079)
+[14:11:21.712] [PROBE R1f] AUDIT    parent live: 4 component(s) in hierarchy of 'assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab'
+[14:11:21.712] [PROBE R1f] AUDIT      [assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab] UnityEngine.Transform
+[14:11:21.712] [PROBE R1f] AUDIT      [assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab] BaseEntity
+[14:11:21.712] [PROBE R1f] AUDIT      [nuclear_warhead] UnityEngine.Transform
+[14:11:21.713] [PROBE R1f] AUDIT      [nuclear_warhead] UnityEngine.MeshCollider
+[14:11:21.713] [PROBE R1f] STEP     server-side silo missile copy created under 'assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab' world=(-2067.61, 6.45, 858.81)
+[14:11:21.713] [PROBE R1f] AUDIT    server-side copy: 1 transform(s) under 'nuclear_silo_missile(Clone)'
+[14:11:21.713] [PROBE R1f] AUDIT      'nuclear_silo_missile(Clone)' active=False [Transform, MeshCollider]
+[14:11:21.714] [PROBE R1f] RESULT   Operator: stand 30 m away and look 14 m in front of you at about 1 m height, then report whether you see the missile body. Expected: NO. If SCENE listed an in-world silo missile, also go to its position and report whether it is visible there.
+[14:11:26.718] [PROBE R1f] TICK     #1 t=+5.9s operator=(-2067.55, 4.45, 845.37) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:31.731] [PROBE R1f] TICK     #2 t=+10.9s operator=(-2063.03, 4.23, 855.17) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:36.737] [PROBE R1f] TICK     #3 t=+15.9s operator=(-2065.42, 4.24, 858.53) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:41.749] [PROBE R1f] TICK     #4 t=+20.9s operator=(-2061.54, 4.26, 848.76) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:46.754] [PROBE R1f] TICK     #5 t=+25.9s operator=(-2065.88, 4.17, 853.01) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:51.757] [PROBE R1f] TICK     #6 t=+30.9s operator=(-2067.23, 4.16, 852.53) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:56.758] [PROBE R1f] TICK     #7 t=+35.9s operator=(-2064.92, 4.19, 851.17) yaw=0.0 | networked parent=(-2067.61, 6.45, 858.81) net=8116079
+[14:11:59.887] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r1f | end
+[14:11:59.887] [PROBE R1f] ENV      end: utc=2026-10-18T14:11:59.8878290Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:11:59.887] [PROBE R1f] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2064.92, 4.19, 851.17) yaw=0.0 pitch=0.0
+[14:11:59.888] [PROBE R1f] ENV      end: tracked=1 cleanupItems=2 r5Armed=False r5SmokeSeconds=15.0
+[14:11:59.888] [PROBE R1f] DEBUG    cleanup starting: 2 item(s), reverse order
+[14:11:59.888] [PROBE R1f] DEBUG    cleanup item 1/2: destroy server-side silo missile copy
+[14:11:59.888] [PROBE R1f] CLEANUP  OK   destroy server-side silo missile copy: destroyed
+[14:11:59.888] [PROBE R1f] DEBUG    cleanup item 2/2: kill networked parent
+[14:11:59.889] [PROBE R1f] CLEANUP  OK   kill networked parent: killed; IsDestroyed=True
+########## PROBE R1f END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:11:59.889] [PROBE R1f] PENDING  no observation yet. Queued for collection by /probe end.
+[14:11:59.889] [SESSION] BOX      observation box opened for R1f (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:13:13.390] [SESSION] BOX      input field sent text: words=16 characters=72
+[14:13:13.491] [SESSION] BOX      submit pressed: stored words=16 characters=72
+[14:13:13.491] [SESSION] BOX      observation box closed: submitted
+[14:13:13.492] [SESSION] COLLECT  R1f observation via observation box: words=16 characters=72
+[14:13:13.492] [PROBE R1f] OBSERVE  I see the MIRV parts of the missle prior to where we will change them to
+########## PROBE R1f END ########## outcome=ended by operator; cleanup=OK; duration=112.6s; observation=yes; results=1
+[14:13:35.188] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r1e
+[14:13:43.157] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r7
+########## PROBE R7 START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:13:43.1579940Z
+[14:13:43.158] [PROBE R7] DEBUG    raw args: 0 item(s): ''
+[14:13:43.158] [PROBE R7] ENV      start: utc=2026-10-18T14:13:43.1582560Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:13:43.158] [PROBE R7] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2064.92, 4.19, 851.17) yaw=0.0 pitch=0.0
+[14:13:43.158] [PROBE R7] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:13:43.159] [PROBE R7] STEP     marker spawned at (-2064.92, 4.19, 856.17); radius=0.01 sent. Check your map now.
+[14:13:43.160] [PROBE R7] STEP     sweep: 0.01, 0.025, 0.05, 0.1, 0.25 m, 20 s per step. Report circle size vs map grid cells.
+[14:13:48.164] [PROBE R7] TICK     #1 t=+5.0s operator=(-2064.92, 4.19, 851.17) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:13:53.170] [PROBE R7] TICK     #2 t=+10.0s operator=(-2064.92, 4.19, 851.17) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:13:58.176] [PROBE R7] TICK     #3 t=+15.0s operator=(-2064.92, 4.19, 851.17) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:03.165] [PROBE R7] STEP     radius=0.025 sent (step 2/5). Report circle size vs map grid cells, and whether the whole map is tinted.
+[14:14:03.190] [PROBE R7] TICK     #4 t=+20.0s operator=(-2064.92, 4.19, 851.17) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:08.196] [PROBE R7] TICK     #5 t=+25.0s operator=(-2064.92, 4.19, 851.17) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:13.202] [PROBE R7] TICK     #6 t=+30.0s operator=(-2066.10, 4.19, 858.33) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:18.202] [PROBE R7] TICK     #7 t=+35.0s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:23.169] [PROBE R7] STEP     radius=0.05 sent (step 3/5). Report circle size vs map grid cells, and whether the whole map is tinted.
+[14:14:23.217] [PROBE R7] TICK     #8 t=+40.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:28.226] [PROBE R7] TICK     #9 t=+45.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:33.238] [PROBE R7] TICK     #10 t=+50.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:38.247] [PROBE R7] TICK     #11 t=+55.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:43.170] [PROBE R7] STEP     radius=0.1 sent (step 4/5). Report circle size vs map grid cells, and whether the whole map is tinted.
+[14:14:43.255] [PROBE R7] TICK     #12 t=+60.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:48.255] [PROBE R7] TICK     #13 t=+65.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:53.259] [PROBE R7] TICK     #14 t=+70.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:14:58.266] [PROBE R7] TICK     #15 t=+75.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:15:03.172] [PROBE R7] STEP     radius=0.25 sent (step 5/5). Report circle size vs map grid cells, and whether the whole map is tinted.
+[14:15:03.274] [PROBE R7] TICK     #16 t=+80.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:15:08.283] [PROBE R7] TICK     #17 t=+85.1s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | marker=(-2064.92, 4.19, 856.17) net=8119749
+[14:15:12.222] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r7 | end
+[14:15:12.222] [PROBE R7] ENV      end: utc=2026-10-18T14:15:12.2224780Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:15:12.222] [PROBE R7] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2068.96, 4.15, 875.77) yaw=0.0 pitch=0.0
+[14:15:12.222] [PROBE R7] ENV      end: tracked=1 cleanupItems=1 r5Armed=False r5SmokeSeconds=15.0
+[14:15:12.222] [PROBE R7] DEBUG    cleanup starting: 1 item(s), reverse order
+[14:15:12.222] [PROBE R7] DEBUG    cleanup item 1/1: kill marker
+[14:15:12.223] [PROBE R7] CLEANUP  OK   kill marker: killed; IsDestroyed=True
+########## PROBE R7 END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:15:12.223] [PROBE R7] PENDING  no observation yet. Queued for collection by /probe end.
+[14:15:12.223] [SESSION] BOX      observation box opened for R7 (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:15:35.552] [SESSION] BOX      input field sent text: words=11 characters=56
+[14:15:35.682] [SESSION] BOX      submit pressed: stored words=11 characters=56
+[14:15:35.682] [SESSION] BOX      observation box closed: submitted
+[14:15:35.682] [SESSION] COLLECT  R7 observation via observation box: words=11 characters=56
+[14:15:35.682] [PROBE R7] OBSERVE  We should test the moving of the marker with 0.025 size.
+########## PROBE R7 END ########## outcome=ended by operator; cleanup=OK; duration=112.5s; observation=yes; results=0
+[14:15:47.622] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r7 | move | 0.1 | 25
+########## PROBE R7 START ########## v0.8.0 args=[move | 0.1 | 25] operator=76561197972272401 utc=2026-10-18T14:15:47.6227240Z
+[14:15:47.622] [PROBE R7] DEBUG    raw args: 3 item(s): 'move' '0.1' '25'
+[14:15:47.622] [PROBE R7] ENV      start: utc=2026-10-18T14:15:47.6229740Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:15:47.623] [PROBE R7] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2068.96, 4.15, 875.77) yaw=0.0 pitch=0.0
+[14:15:47.623] [PROBE R7] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:15:47.624] [PROBE R7] STEP     moving marker spawned at (-2980.00, 4.15, 0.00) radius=0.1 speed=25 m/s
+[14:15:47.624] [PROBE R7] STEP     map worldsize=6000 m; path x from -2980 to 2980 along z=0; expected 238 s
+[14:15:48.629] [PROBE R7] MOVE     t=+1.0s marker at (-2955.00, 4.15, 0.00)
+[14:15:49.631] [PROBE R7] MOVE     t=+2.0s marker at (-2930.00, 4.15, 0.00)
+[14:15:50.632] [PROBE R7] MOVE     t=+3.0s marker at (-2905.00, 4.15, 0.00)
+[14:15:51.636] [PROBE R7] MOVE     t=+4.0s marker at (-2880.00, 4.15, 0.00)
+[14:15:52.630] [PROBE R7] TICK     #1 t=+5.0s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | moving marker=(-2880.00, 4.15, 0.00) net=8120669
+[14:15:52.642] [PROBE R7] MOVE     t=+5.0s marker at (-2855.00, 4.15, 0.00)
+[14:15:53.644] [PROBE R7] MOVE     t=+6.0s marker at (-2830.00, 4.15, 0.00)
+[14:15:54.649] [PROBE R7] MOVE     t=+7.0s marker at (-2805.00, 4.15, 0.00)
+[14:15:55.652] [PROBE R7] MOVE     t=+8.0s marker at (-2780.00, 4.15, 0.00)
+[14:15:56.653] [PROBE R7] MOVE     t=+9.0s marker at (-2755.00, 4.15, 0.00)
+[14:15:57.641] [PROBE R7] TICK     #2 t=+10.0s operator=(-2068.96, 4.15, 875.77) yaw=0.0 | moving marker=(-2755.00, 4.15, 0.00) net=8120669
+[14:15:57.654] [PROBE R7] MOVE     t=+10.0s marker at (-2730.00, 4.15, 0.00)
+[14:15:58.656] [PROBE R7] MOVE     t=+11.0s marker at (-2705.00, 4.15, 0.00)
+[14:15:59.660] [PROBE R7] MOVE     t=+12.0s marker at (-2680.00, 4.15, 0.00)
+[14:16:00.661] [PROBE R7] MOVE     t=+13.0s marker at (-2655.00, 4.15, 0.00)
+[14:16:01.662] [PROBE R7] MOVE     t=+14.0s marker at (-2630.00, 4.15, 0.00)
+[14:16:02.651] [PROBE R7] TICK     #3 t=+15.0s operator=(-2069.64, 4.18, 879.83) yaw=0.0 | moving marker=(-2630.00, 4.15, 0.00) net=8120669
+[14:16:02.664] [PROBE R7] MOVE     t=+15.0s marker at (-2605.00, 4.15, 0.00)
+[14:16:03.667] [PROBE R7] MOVE     t=+16.0s marker at (-2580.00, 4.15, 0.00)
+[14:16:04.671] [PROBE R7] MOVE     t=+17.0s marker at (-2555.00, 4.15, 0.00)
+[14:16:05.677] [PROBE R7] MOVE     t=+18.0s marker at (-2530.00, 4.15, 0.00)
+[14:16:06.685] [PROBE R7] MOVE     t=+19.0s marker at (-2505.00, 4.15, 0.00)
+[14:16:07.662] [PROBE R7] TICK     #4 t=+20.0s operator=(-2069.64, 4.18, 879.83) yaw=0.0 | moving marker=(-2505.00, 4.15, 0.00) net=8120669
+[14:16:07.689] [PROBE R7] MOVE     t=+20.0s marker at (-2480.00, 4.15, 0.00)
+[14:16:08.692] [PROBE R7] MOVE     t=+21.0s marker at (-2455.00, 4.15, 0.00)
+[14:16:09.699] [PROBE R7] MOVE     t=+22.0s marker at (-2430.00, 4.15, 0.00)
+[14:16:10.706] [PROBE R7] MOVE     t=+23.0s marker at (-2405.00, 4.15, 0.00)
+[14:16:11.708] [PROBE R7] MOVE     t=+24.0s marker at (-2380.00, 4.15, 0.00)
+[14:16:12.675] [PROBE R7] TICK     #5 t=+25.1s operator=(-2069.67, 4.18, 880.01) yaw=0.0 | moving marker=(-2380.00, 4.15, 0.00) net=8120669
+[14:16:12.715] [PROBE R7] MOVE     t=+25.0s marker at (-2355.00, 4.15, 0.00)
+[14:16:13.721] [PROBE R7] MOVE     t=+26.0s marker at (-2330.00, 4.15, 0.00)
+[14:16:14.722] [PROBE R7] MOVE     t=+27.0s marker at (-2305.00, 4.15, 0.00)
+[14:16:15.725] [PROBE R7] MOVE     t=+28.0s marker at (-2280.00, 4.15, 0.00)
+[14:16:16.736] [PROBE R7] MOVE     t=+29.0s marker at (-2255.00, 4.15, 0.00)
+[14:16:17.676] [PROBE R7] TICK     #6 t=+30.1s operator=(-2069.67, 4.18, 880.01) yaw=0.0 | moving marker=(-2255.00, 4.15, 0.00) net=8120669
+[14:16:17.738] [PROBE R7] MOVE     t=+30.0s marker at (-2230.00, 4.15, 0.00)
+[14:16:18.740] [PROBE R7] MOVE     t=+31.0s marker at (-2205.00, 4.15, 0.00)
+[14:16:19.749] [PROBE R7] MOVE     t=+32.0s marker at (-2180.00, 4.15, 0.00)
+[14:16:20.753] [PROBE R7] MOVE     t=+33.0s marker at (-2155.00, 4.15, 0.00)
+[14:16:21.759] [PROBE R7] MOVE     t=+34.0s marker at (-2130.00, 4.15, 0.00)
+[14:16:22.685] [PROBE R7] TICK     #7 t=+35.1s operator=(-2069.67, 4.18, 880.01) yaw=0.0 | moving marker=(-2130.00, 4.15, 0.00) net=8120669
+[14:16:22.759] [PROBE R7] MOVE     t=+35.0s marker at (-2105.00, 4.15, 0.00)
+[14:16:23.765] [PROBE R7] MOVE     t=+36.0s marker at (-2080.00, 4.15, 0.00)
+[14:16:24.770] [PROBE R7] MOVE     t=+37.0s marker at (-2055.00, 4.15, 0.00)
+[14:16:25.771] [PROBE R7] MOVE     t=+38.0s marker at (-2030.00, 4.15, 0.00)
+[14:16:26.780] [PROBE R7] MOVE     t=+39.0s marker at (-2005.00, 4.15, 0.00)
+[14:16:27.687] [PROBE R7] TICK     #8 t=+40.1s operator=(-2069.67, 4.18, 880.01) yaw=0.0 | moving marker=(-2005.00, 4.15, 0.00) net=8120669
+[14:16:27.782] [PROBE R7] MOVE     t=+40.0s marker at (-1980.00, 4.15, 0.00)
+[14:16:28.788] [PROBE R7] MOVE     t=+41.0s marker at (-1955.00, 4.15, 0.00)
+[14:16:29.794] [PROBE R7] MOVE     t=+42.0s marker at (-1930.00, 4.15, 0.00)
+[14:16:30.800] [PROBE R7] MOVE     t=+43.0s marker at (-1905.00, 4.15, 0.00)
+[14:16:31.801] [PROBE R7] MOVE     t=+44.0s marker at (-1880.00, 4.15, 0.00)
+[14:16:32.690] [PROBE R7] TICK     #9 t=+45.1s operator=(-2069.67, 4.18, 880.01) yaw=0.0 | moving marker=(-1880.00, 4.15, 0.00) net=8120669
+[14:16:32.801] [PROBE R7] MOVE     t=+45.0s marker at (-1855.00, 4.15, 0.00)
+[14:16:33.809] [PROBE R7] MOVE     t=+46.0s marker at (-1830.00, 4.15, 0.00)
+[14:16:34.816] [PROBE R7] MOVE     t=+47.0s marker at (-1805.00, 4.15, 0.00)
+[14:16:34.839] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r7 | end
+[14:16:34.839] [PROBE R7] ENV      end: utc=2026-10-18T14:16:34.8397200Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:16:34.839] [PROBE R7] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2069.67, 4.18, 880.01) yaw=0.0 pitch=0.0
+[14:16:34.839] [PROBE R7] ENV      end: tracked=1 cleanupItems=1 r5Armed=False r5SmokeSeconds=15.0
+[14:16:34.840] [PROBE R7] DEBUG    cleanup starting: 1 item(s), reverse order
+[14:16:34.840] [PROBE R7] DEBUG    cleanup item 1/1: kill moving marker
+[14:16:34.840] [PROBE R7] CLEANUP  OK   kill moving marker: killed; IsDestroyed=True
+########## PROBE R7 END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:16:34.840] [PROBE R7] PENDING  no observation yet. Queued for collection by /probe end.
+[14:16:34.840] [SESSION] BOX      observation box opened for R7 (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:17:00.293] [SESSION] BOX      input field sent text: words=14 characters=74
+[14:17:00.366] [SESSION] BOX      submit pressed: stored words=14 characters=74
+[14:17:00.366] [SESSION] BOX      observation box closed: submitted
+[14:17:00.366] [SESSION] COLLECT  R7 observation via observation box: words=14 characters=74
+[14:17:00.366] [PROBE R7] OBSERVE  We should test this again but sped up even more to simulate missile speed.
+########## PROBE R7 END ########## outcome=ended by operator; cleanup=OK; duration=72.7s; observation=yes; results=0
+[14:17:15.856] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r9
+########## PROBE R9 START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:17:15.8568330Z
+[14:17:15.856] [PROBE R9] DEBUG    raw args: 0 item(s): ''
+[14:17:15.857] [PROBE R9] ENV      start: utc=2026-10-18T14:17:15.8570820Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:17:15.857] [PROBE R9] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2071.15, 4.15, 876.48) yaw=0.0 pitch=0.0
+[14:17:15.857] [PROBE R9] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:17:15.858] [PROBE R9] STEP     mode=static (not parented) spacing=2.0 m centre=(-2071.15, 5.15, 881.48)
+[14:17:15.858] [PROBE R9] STEP     operator at (-2071.15, 4.15, 876.48)
+[14:17:15.858] [PROBE R9] STEP     plume 1: spawned world=(-2074.15, 5.15, 881.48) dist=5.9 m
+[14:17:15.859] [PROBE R9] STEP     plume 2: spawned world=(-2072.15, 5.15, 881.48) dist=5.2 m
+[14:17:15.859] [PROBE R9] STEP     plume 3: spawned world=(-2070.15, 5.15, 881.48) dist=5.2 m
+[14:17:15.859] [PROBE R9] STEP     plume 4: spawned world=(-2068.15, 5.15, 881.48) dist=5.9 m
+[14:17:15.859] [PROBE R9] RESULT   4 plumes, mode=static, spacing 2.0 m, centre 5 m in front. Report: how many you see, where they sit relative to you, follow or fixed, look.
+[14:17:20.866] [PROBE R9] TICK     #1 t=+5.0s operator=(-2071.15, 4.15, 876.48) yaw=0.0 | plume 1=(-2074.15, 4.21, 881.48) net=8121149 | plume 2=(-2072.15, 4.21, 881.48) net=8121150 | plume 3=(-2070.15, 4.21, 881.48) net=8121151 | plume 4=(-2068.15, 4.21, 881.48) net=8121152
+[14:17:25.871] [PROBE R9] TICK     #2 t=+10.0s operator=(-2067.46, 4.15, 873.68) yaw=0.0 | plume 1=(-2074.15, 4.21, 881.48) net=8121149 | plume 2=(-2072.15, 4.21, 881.48) net=8121150 | plume 3=(-2070.15, 4.21, 881.48) net=8121151 | plume 4=(-2068.15, 4.21, 881.48) net=8121152
+[14:17:30.884] [PROBE R9] TICK     #3 t=+15.0s operator=(-2068.90, 4.15, 873.85) yaw=0.0 | plume 1=(-2074.15, 4.21, 881.48) net=8121149 | plume 2=(-2072.15, 4.21, 881.48) net=8121150 | plume 3=(-2070.15, 4.21, 881.48) net=8121151 | plume 4=(-2068.15, 4.21, 881.48) net=8121152
+[14:17:35.889] [PROBE R9] TICK     #4 t=+20.0s operator=(-2068.90, 4.15, 873.85) yaw=0.0 | plume 1=(-2074.15, 4.21, 881.48) net=8121149 | plume 2=(-2072.15, 4.21, 881.48) net=8121150 | plume 3=(-2070.15, 4.21, 881.48) net=8121151 | plume 4=(-2068.15, 4.21, 881.48) net=8121152
+[14:17:40.901] [PROBE R9] TICK     #5 t=+25.0s operator=(-2068.90, 4.15, 873.85) yaw=0.0 | plume 1=(-2074.15, 4.21, 881.48) net=8121149 | plume 2=(-2072.15, 4.21, 881.48) net=8121150 | plume 3=(-2070.15, 4.21, 881.48) net=8121151 | plume 4=(-2068.15, 4.21, 881.48) net=8121152
+[14:17:45.699] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r9 | end
+[14:17:45.699] [PROBE R9] ENV      end: utc=2026-10-18T14:17:45.6994400Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:17:45.699] [PROBE R9] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2068.90, 4.15, 873.85) yaw=0.0 pitch=0.0
+[14:17:45.699] [PROBE R9] ENV      end: tracked=4 cleanupItems=4 r5Armed=False r5SmokeSeconds=15.0
+[14:17:45.699] [PROBE R9] DEBUG    cleanup starting: 4 item(s), reverse order
+[14:17:45.699] [PROBE R9] DEBUG    cleanup item 1/4: kill plume 4
+[14:17:45.700] [PROBE R9] CLEANUP  OK   kill plume 4: killed; IsDestroyed=True
+[14:17:45.700] [PROBE R9] DEBUG    cleanup item 2/4: kill plume 3
+[14:17:45.700] [PROBE R9] CLEANUP  OK   kill plume 3: killed; IsDestroyed=True
+[14:17:45.700] [PROBE R9] DEBUG    cleanup item 3/4: kill plume 2
+[14:17:45.700] [PROBE R9] CLEANUP  OK   kill plume 2: killed; IsDestroyed=True
+[14:17:45.700] [PROBE R9] DEBUG    cleanup item 4/4: kill plume 1
+[14:17:45.700] [PROBE R9] CLEANUP  OK   kill plume 1: killed; IsDestroyed=True
+########## PROBE R9 END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:17:45.701] [PROBE R9] PENDING  no observation yet. Queued for collection by /probe end.
+[14:17:45.701] [SESSION] BOX      observation box opened for R9 (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:18:23.409] [SESSION] BOX      input field sent text: words=15 characters=86
+[14:18:23.562] [SESSION] BOX      submit pressed: stored words=15 characters=86
+[14:18:23.562] [SESSION] BOX      observation box closed: submitted
+[14:18:23.562] [SESSION] COLLECT  R9 observation via observation box: words=15 characters=86
+[14:18:23.562] [PROBE R9] OBSERVE  4 Plumes are spawned directly north of the player, they are not attatched, and static.
+########## PROBE R9 END ########## outcome=ended by operator; cleanup=OK; duration=67.7s; observation=yes; results=1
+[14:18:30.090] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r9 | follow
+########## PROBE R9 START ########## v0.8.0 args=[follow] operator=76561197972272401 utc=2026-10-18T14:18:30.0903850Z
+[14:18:30.090] [PROBE R9] DEBUG    raw args: 1 item(s): 'follow'
+[14:18:30.090] [PROBE R9] ENV      start: utc=2026-10-18T14:18:30.0906310Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:18:30.090] [PROBE R9] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2069.41, 4.15, 873.45) yaw=0.0 pitch=0.0
+[14:18:30.090] [PROBE R9] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:18:30.090] [PROBE R9] STEP     mode=static (not parented) spacing=2.0 m centre=(-2069.41, 5.15, 878.45)
+[14:18:30.091] [PROBE R9] STEP     operator at (-2069.41, 4.15, 873.45)
+[14:18:30.091] [PROBE R9] STEP     plume 1: spawned world=(-2072.41, 5.15, 878.45) dist=5.9 m
+[14:18:30.091] [PROBE R9] STEP     plume 2: spawned world=(-2070.41, 5.15, 878.45) dist=5.2 m
+[14:18:30.092] [PROBE R9] STEP     plume 3: spawned world=(-2068.41, 5.15, 878.45) dist=5.2 m
+[14:18:30.092] [PROBE R9] STEP     plume 4: spawned world=(-2066.41, 5.15, 878.45) dist=5.9 m
+[14:18:30.092] [PROBE R9] RESULT   4 plumes, mode=static, spacing 2.0 m, centre 5 m in front. Report: how many you see, where they sit relative to you, follow or fixed, look.
+[14:18:35.092] [PROBE R9] TICK     #1 t=+5.0s operator=(-2061.90, 4.15, 873.60) yaw=0.0 | plume 1=(-2072.41, 4.17, 878.45) net=8121587 | plume 2=(-2070.41, 4.17, 878.45) net=8121588 | plume 3=(-2068.41, 4.17, 878.45) net=8121589 | plume 4=(-2066.41, 4.18, 878.45) net=8121590
+[14:18:39.426] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r9 | end
+[14:18:39.426] [PROBE R9] ENV      end: utc=2026-10-18T14:18:39.4266880Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:18:39.426] [PROBE R9] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2060.39, 4.23, 870.71) yaw=0.0 pitch=0.0
+[14:18:39.426] [PROBE R9] ENV      end: tracked=4 cleanupItems=4 r5Armed=False r5SmokeSeconds=15.0
+[14:18:39.427] [PROBE R9] DEBUG    cleanup starting: 4 item(s), reverse order
+[14:18:39.427] [PROBE R9] DEBUG    cleanup item 1/4: kill plume 4
+[14:18:39.427] [PROBE R9] CLEANUP  OK   kill plume 4: killed; IsDestroyed=True
+[14:18:39.427] [PROBE R9] DEBUG    cleanup item 2/4: kill plume 3
+[14:18:39.427] [PROBE R9] CLEANUP  OK   kill plume 3: killed; IsDestroyed=True
+[14:18:39.427] [PROBE R9] DEBUG    cleanup item 3/4: kill plume 2
+[14:18:39.427] [PROBE R9] CLEANUP  OK   kill plume 2: killed; IsDestroyed=True
+[14:18:39.428] [PROBE R9] DEBUG    cleanup item 4/4: kill plume 1
+[14:18:39.428] [PROBE R9] CLEANUP  OK   kill plume 1: killed; IsDestroyed=True
+########## PROBE R9 END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:18:39.428] [PROBE R9] PENDING  no observation yet. Queued for collection by /probe end.
+[14:18:39.428] [SESSION] BOX      observation box opened for R9 (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:18:55.838] [SESSION] BOX      input field sent text: words=8 characters=41
+[14:18:55.937] [SESSION] BOX      submit pressed: stored words=8 characters=41
+[14:18:55.938] [SESSION] BOX      observation box closed: submitted
+[14:18:55.938] [SESSION] COLLECT  R9 observation via observation box: words=8 characters=41
+[14:18:55.938] [PROBE R9] OBSERVE  Using follow the plumes do not follow me.
+########## PROBE R9 END ########## outcome=ended by operator; cleanup=OK; duration=25.8s; observation=yes; results=1
+[14:19:01.579] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6
+########## PROBE R6 START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:19:01.5801940Z
+[14:19:01.580] [PROBE R6] DEBUG    raw args: 0 item(s): ''
+[14:19:01.580] [PROBE R6] ENV      start: utc=2026-10-18T14:19:01.5804480Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:19:01.580] [PROBE R6] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2060.39, 4.23, 870.71) yaw=0.0 pitch=0.0
+[14:19:01.580] [PROBE R6] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:19:01.581] [PROBE R6] STEP     Effect.server.Run(SirenPrefab) at 1.0 m, single pulse
+[14:19:01.581] [PROBE R6] RESULT   submitted. Check the console for 'unknown effect'. Report whether you heard it and at what distance.
+[14:19:06.588] [PROBE R6] TICK     #1 t=+5.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:11.593] [PROBE R6] TICK     #2 t=+10.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:16.596] [PROBE R6] TICK     #3 t=+15.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:21.602] [PROBE R6] TICK     #4 t=+20.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:26.604] [PROBE R6] TICK     #5 t=+25.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:31.610] [PROBE R6] TICK     #6 t=+30.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:36.611] [PROBE R6] TICK     #7 t=+35.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:41.616] [PROBE R6] TICK     #8 t=+40.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:46.627] [PROBE R6] TICK     #9 t=+45.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:51.627] [PROBE R6] TICK     #10 t=+50.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0
+[14:19:52.772] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6 | end
+[14:19:52.772] [PROBE R6] ENV      end: utc=2026-10-18T14:19:52.7726220Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:19:52.772] [PROBE R6] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2060.39, 4.23, 870.71) yaw=0.0 pitch=0.0
+[14:19:52.772] [PROBE R6] ENV      end: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:19:52.773] [PROBE R6] DEBUG    cleanup starting: 0 item(s), reverse order
+########## PROBE R6 END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:19:52.773] [PROBE R6] PENDING  no observation yet. Queued for collection by /probe end.
+[14:19:52.773] [SESSION] BOX      observation box opened for R6 (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:20:12.960] [SESSION] BOX      input field sent text: words=16 characters=154
+[14:20:13.150] [SESSION] BOX      submit pressed: stored words=16 characters=154
+[14:20:13.150] [SESSION] BOX      observation box closed: submitted
+[14:20:13.150] [SESSION] COLLECT  R6 observation via observation box: words=16 characters=154
+[14:20:13.150] [PROBE R6] OBSERVE  Tried to spawn an effect without a EffectRecycle component (assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab) This appeared in the client
+########## PROBE R6 END ########## outcome=ended by operator; cleanup=OK; duration=71.6s; observation=yes; results=1
+[14:20:17.931] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6d
+[14:20:28.328] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe 6b
+[14:20:36.399] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6b
+########## PROBE R6b START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:20:36.3993650Z
+[14:20:36.399] [PROBE R6b] DEBUG    raw args: 0 item(s): ''
+[14:20:36.399] [PROBE R6b] ENV      start: utc=2026-10-18T14:20:36.3996130Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:20:36.399] [PROBE R6b] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2060.39, 4.23, 870.71) yaw=0.0 pitch=0.0
+[14:20:36.399] [PROBE R6b] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:20:36.400] [PROBE R6b] STEP     FindPrefab OK: airraidsound (path='assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab')
+[14:20:36.401] [PROBE R6b] AUDIO    prefab: 0 AudioSource component(s) on airraidsound (reflected)
+[14:20:36.401] [PROBE R6b] STEP     spawned BaseEntity at (-2060.39, 5.23, 871.71); net id=8122310
+[14:20:36.401] [PROBE R6b] AUDIO    live: 0 AudioSource component(s) on assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab (reflected)
+[14:20:36.401] [PROBE R6b] STEP     NEXT: listen at 1 m, then walk out to 200, 800, 1900 m and report where it stops. /probe R6b end <observation>
+[14:20:38.406] [PROBE R6b] AUDIO    +2 s: AudioSources currently playing = 0
+[14:20:41.406] [PROBE R6b] TICK     #1 t=+5.0s operator=(-2060.39, 4.23, 870.71) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:20:46.402] [PROBE R6b] AUDIO    +10 s: AudioSources currently playing = 0
+[14:20:46.409] [PROBE R6b] TICK     #2 t=+10.0s operator=(-2060.50, 4.23, 868.77) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:20:51.415] [PROBE R6b] TICK     #3 t=+15.0s operator=(-2090.20, 195.83, 381.77) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:20:56.425] [PROBE R6b] TICK     #4 t=+20.0s operator=(-1814.80, 193.16, -61.22) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:01.438] [PROBE R6b] TICK     #5 t=+25.0s operator=(-1722.66, 40.96, -487.12) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:06.445] [PROBE R6b] TICK     #6 t=+30.0s operator=(-1631.00, 41.31, -800.77) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:11.452] [PROBE R6b] TICK     #7 t=+35.1s operator=(-1597.60, 41.31, -915.08) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:16.458] [PROBE R6b] TICK     #8 t=+40.1s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:21.463] [PROBE R6b] TICK     #9 t=+45.1s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:26.464] [PROBE R6b] TICK     #10 t=+50.1s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren entity=(-2060.39, 5.23, 871.71) net=8122310
+[14:21:27.329] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6b | end
+[14:21:27.329] [PROBE R6b] ENV      end: utc=2026-10-18T14:21:27.3296240Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:21:27.329] [PROBE R6b] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-1567.80, 41.31, -1017.06) yaw=0.0 pitch=0.0
+[14:21:27.329] [PROBE R6b] ENV      end: tracked=1 cleanupItems=1 r5Armed=False r5SmokeSeconds=15.0
+[14:21:27.330] [PROBE R6b] DEBUG    cleanup starting: 1 item(s), reverse order
+[14:21:27.330] [PROBE R6b] DEBUG    cleanup item 1/1: kill siren entity
+[14:21:27.330] [PROBE R6b] CLEANUP  OK   kill siren entity: killed; IsDestroyed=True
+########## PROBE R6b END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:21:27.330] [PROBE R6b] PENDING  no observation yet. Queued for collection by /probe end.
+[14:21:27.330] [SESSION] BOX      observation box opened for R6b (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:21:50.880] [SESSION] BOX      input field sent text: words=16 characters=87
+[14:21:50.954] [SESSION] BOX      submit pressed: stored words=16 characters=87
+[14:21:50.954] [SESSION] BOX      observation box closed: submitted
+[14:21:50.954] [SESSION] COLLECT  R6b observation via observation box: words=16 characters=87
+[14:21:50.954] [PROBE R6b] OBSERVE  (-1567.80, 41.31, -1017.06) this is how far i went from where the siren spawned to stop
+########## PROBE R6b END ########## outcome=ended by operator; cleanup=OK; duration=74.6s; observation=yes; results=0
+[14:21:57.627] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6c
+########## PROBE R6c START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:21:57.6274370Z
+[14:21:57.627] [PROBE R6c] DEBUG    raw args: 0 item(s): ''
+[14:21:57.627] [PROBE R6c] ENV      start: utc=2026-10-18T14:21:57.6276900Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:21:57.627] [PROBE R6c] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-1567.80, 41.31, -1017.06) yaw=0.0 pitch=0.0
+[14:21:57.627] [PROBE R6c] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:21:57.628] [PROBE R6c] AUDIT    prefab: 2 component(s) in hierarchy of 'airraidsound'
+[14:21:57.628] [PROBE R6c] AUDIT      [airraidsound] UnityEngine.Transform
+[14:21:57.628] [PROBE R6c] AUDIT      [airraidsound] BaseEntity
+[14:21:57.628] [PROBE R6c] AUDIT    live: 2 component(s) in hierarchy of 'assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab'
+[14:21:57.628] [PROBE R6c] AUDIT      [assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab] UnityEngine.Transform
+[14:21:57.629] [PROBE R6c] AUDIT      [assets/bundled/prefabs/modding/sound/air raid/airraidsound.prefab] BaseEntity
+[14:21:57.629] [PROBE R6c] RESULT   audit complete; entity placed 20 m in front and removed on end. Compare the prefab and live lists in the log.
+[14:22:02.629] [PROBE R6c] TICK     #1 t=+5.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:07.631] [PROBE R6c] TICK     #2 t=+10.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:12.638] [PROBE R6c] TICK     #3 t=+15.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:17.644] [PROBE R6c] TICK     #4 t=+20.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:22.647] [PROBE R6c] TICK     #5 t=+25.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:27.649] [PROBE R6c] TICK     #6 t=+30.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:32.662] [PROBE R6c] TICK     #7 t=+35.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:37.675] [PROBE R6c] TICK     #8 t=+40.0s operator=(-1567.80, 41.31, -1017.06) yaw=0.0 | siren audit entity=(-1567.80, 42.31, -997.06) net=8122918
+[14:22:38.667] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6c | end
+[14:22:38.667] [PROBE R6c] ENV      end: utc=2026-10-18T14:22:38.6675880Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:22:38.667] [PROBE R6c] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-1567.80, 41.31, -1017.06) yaw=0.0 pitch=0.0
+[14:22:38.667] [PROBE R6c] ENV      end: tracked=1 cleanupItems=1 r5Armed=False r5SmokeSeconds=15.0
+[14:22:38.668] [PROBE R6c] DEBUG    cleanup starting: 1 item(s), reverse order
+[14:22:38.668] [PROBE R6c] DEBUG    cleanup item 1/1: kill siren audit entity
+[14:22:38.668] [PROBE R6c] CLEANUP  OK   kill siren audit entity: killed; IsDestroyed=True
+########## PROBE R6c END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:22:38.668] [PROBE R6c] PENDING  no observation yet. Queued for collection by /probe end.
+[14:22:38.668] [SESSION] BOX      observation box opened for R6c (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:22:46.454] [SESSION] BOX      input field sent text: words=7 characters=34
+[14:22:46.545] [SESSION] BOX      submit pressed: stored words=7 characters=34
+[14:22:46.545] [SESSION] BOX      observation box closed: submitted
+[14:22:46.546] [SESSION] COLLECT  R6c observation via observation box: words=7 characters=34
+[14:22:46.546] [PROBE R6c] OBSERVE  Unclear what aim of this test was.
+########## PROBE R6c END ########## outcome=ended by operator; cleanup=OK; duration=48.9s; observation=yes; results=1
+[14:23:11.240] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r6d
+[14:23:39.652] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r2
+########## PROBE R2 START ########## v0.8.0 args=[] operator=76561197972272401 utc=2026-10-18T14:23:39.6526500Z
+[14:23:39.652] [PROBE R2] DEBUG    raw args: 0 item(s): ''
+[14:23:39.652] [PROBE R2] ENV      start: utc=2026-10-18T14:23:39.6529120Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:23:39.653] [PROBE R2] ENV      start: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-1438.66, 7.32, -273.19) yaw=0.0 pitch=0.0
+[14:23:39.653] [PROBE R2] ENV      start: tracked=0 cleanupItems=0 r5Armed=False r5SmokeSeconds=15.0
+[14:23:39.860] [PROBE R2] STEP     survey: 98 CCTV_RC, 67 distinct identifiers; duplicated: COBALT1 x32
+[14:23:39.861] [PROBE R2] STEP     prefab identifier before spawn='COBALT1'; setting template 'NUKE#ID'
+[14:23:39.861] [PROBE R2] RESULT   own identifier=NUKE8123533; valid=True; occurrences including this camera=1
+[14:23:39.861] [PROBE R2] STEP     parented to operator (worldPositionStays: true)
+[14:23:39.861] [PROBE R2] STEP     NEXT: at a computer station add 'NUKE8123533' as a bookmark. Walk, jump, turn. Report the feed and which camera it shows.
+[14:23:44.862] [PROBE R2] TICK     #1 t=+5.2s operator=(-1438.66, 7.32, -273.19) yaw=0.0 | cctv=(-1438.66, 7.32, -273.19) net=8123533
+[14:23:49.869] [PROBE R2] TICK     #2 t=+10.2s operator=(-1544.14, 254.38, -3.32) yaw=0.0 | cctv=(-1544.14, 254.38, -3.32) net=8123533
+[14:23:54.870] [PROBE R2] TICK     #3 t=+15.2s operator=(-6690.49, 3.00, -254.14) yaw=0.0 | cctv=(-6690.49, 3.00, -254.14) net=8123533
+[14:23:59.870] [PROBE R2] TICK     #4 t=+20.2s operator=(-6690.49, 3.00, -254.14) yaw=0.0 | cctv=(-6690.49, 3.00, -254.14) net=8123533
+[14:24:04.880] [PROBE R2] TICK     #5 t=+25.2s operator=(-6690.49, 4.56, -254.14) yaw=0.0 | cctv=(-6690.49, 4.56, -254.14) net=8123533
+[14:24:09.886] [PROBE R2] TICK     #6 t=+30.2s operator=(-2623.65, 5.48, 729.95) yaw=0.0 | cctv=(-2623.65, 5.48, 729.95) net=8123533
+[14:24:14.891] [PROBE R2] TICK     #7 t=+35.2s operator=(-2042.04, 5.74, 870.61) yaw=0.0 | cctv=(-2042.04, 5.74, 870.61) net=8123533
+[14:24:19.896] [PROBE R2] TICK     #8 t=+40.2s operator=(-2041.55, 5.47, 871.30) yaw=0.0 | cctv=(-2041.55, 5.47, 871.30) net=8123533
+[14:24:24.900] [PROBE R2] TICK     #9 t=+45.2s operator=(-2042.42, 5.64, 870.64) yaw=247.5 | cctv=(-2042.42, 5.64, 870.64) net=8123533
+[14:24:29.903] [PROBE R2] TICK     #10 t=+50.3s operator=(-2042.42, 5.64, 870.64) yaw=247.5 | cctv=(-2042.42, 5.64, 870.64) net=8123533
+[14:24:34.917] [PROBE R2] TICK     #11 t=+55.3s operator=(-2039.88, 7.07, 870.89) yaw=0.0 | cctv=(-2039.88, 7.07, 870.89) net=8123533
+[14:24:39.919] [PROBE R2] TICK     #12 t=+60.3s operator=(-2039.39, 7.92, 872.05) yaw=0.0 | cctv=(-2039.39, 7.92, 872.05) net=8123533
+[14:24:44.920] [PROBE R2] TICK     #13 t=+65.3s operator=(-2039.39, 7.92, 872.05) yaw=0.0 | cctv=(-2039.39, 7.92, 872.05) net=8123533
+[14:24:45.748] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe r2 | end
+[14:24:45.748] [PROBE R2] ENV      end: utc=2026-10-18T14:24:45.7487440Z hostname='Todd's Testing Ground' level='Procedural Map' worldsize=6000 players=1
+[14:24:45.748] [PROBE R2] ENV      end: operator id=76561197972272401 name='Todd the Wraith' admin=True pos=(-2039.39, 7.92, 872.05) yaw=0.0 pitch=0.0
+[14:24:45.749] [PROBE R2] ENV      end: tracked=1 cleanupItems=1 r5Armed=False r5SmokeSeconds=15.0
+[14:24:45.749] [PROBE R2] DEBUG    cleanup starting: 1 item(s), reverse order
+[14:24:45.749] [PROBE R2] DEBUG    cleanup item 1/1: kill cctv
+[14:24:45.749] [PROBE R2] CLEANUP  OK   kill cctv: killed; IsDestroyed=True
+########## PROBE R2 END-PENDING ########## outcome=ended by operator; cleanup=OK; observation=PENDING; queue position 1
+[14:24:45.749] [PROBE R2] PENDING  no observation yet. Queued for collection by /probe end.
+[14:24:45.749] [SESSION] BOX      observation box opened for R2 (operator 76561197972272401); 1 outstanding; limit 1000 words / 6000 characters
+[14:25:14.314] [SESSION] BOX      input field sent text: words=16 characters=101
+[14:25:14.421] [SESSION] BOX      submit pressed: stored words=16 characters=101
+[14:25:14.421] [SESSION] BOX      observation box closed: submitted
+[14:25:14.421] [SESSION] COLLECT  R2 observation via observation box: words=16 characters=101
+[14:25:14.421] [PROBE R2] OBSERVE  Camera still in correct location, use shortended number that is not the cameras network ID, something
+########## PROBE R2 END ########## outcome=ended by operator; cleanup=OK; duration=94.8s; observation=yes; results=1
+[14:25:31.943] [SESSION] CMD      operator=76561197972272401 'Todd the Wraith' typed: /probe end
+[14:25:31.944] [SESSION] INFO     reason=operator /probe end; utc=2026-10-18T14:25:31.9443540Z; duration=917.6s; probes run=10
+[14:25:31.944] [SESSION] SUMMARY  R1c outcome=ended by operator cleanup=OK duration=36.5s observation=yes
+[14:25:31.944] [SESSION] SUMMARY  R1f outcome=ended by operator cleanup=OK duration=112.6s observation=yes
+[14:25:31.944] [SESSION] SUMMARY  R7 outcome=ended by operator cleanup=OK duration=112.5s observation=yes
+[14:25:31.944] [SESSION] SUMMARY  R7 outcome=ended by operator cleanup=OK duration=72.7s observation=yes
+[14:25:31.945] [SESSION] SUMMARY  R9 outcome=ended by operator cleanup=OK duration=67.7s observation=yes
+[14:25:31.945] [SESSION] SUMMARY  R9 outcome=ended by operator cleanup=OK duration=25.8s observation=yes
+[14:25:31.945] [SESSION] SUMMARY  R6 outcome=ended by operator cleanup=OK duration=71.6s observation=yes
+[14:25:31.945] [SESSION] SUMMARY  R6b outcome=ended by operator cleanup=OK duration=74.6s observation=yes
+[14:25:31.945] [SESSION] SUMMARY  R6c outcome=ended by operator cleanup=OK duration=48.9s observation=yes
+[14:25:31.945] [SESSION] SUMMARY  R2 outcome=ended by operator cleanup=OK duration=94.8s observation=yes
+[14:25:31.945] [SESSION] BANNER   ########## PROBE SESSION END ##########

@@ -526,3 +526,109 @@ Version **0.7.0**. Adds R1c, R1f, and `/probe R7 move`. Compile fix from 0.6.1 i
 - **R6d (not built yet).** Falloff curve for the siren: walk out in 200 m steps and log where it stops and restarts.
 
 Suggested order: R1c → R1f → R7 sweep → R7 move (radius 0.1, 25 m/s) → R9 follow → R6d.
+
+
+### Run 6 — 2026-10-18 (operator session log `session_20261018-141014.txt`, probes v0.8.0)
+
+Log is at `probes/logs/run-6/session_20261018-141014.txt` (copy on commit). Operator: Todd the Wraith, admin, server "Todd's Testing Ground", Procedural Map 6000 m.
+
+| Probe | Result in log | Operator observation | Verdict |
+|---|---|---|---|
+| R1c | 18 671 assets, 2 408 networked entity paths; 118 keyword matches; 6 networked entity prefabs. Silo asset `nuclear_silo_missile.prefab` is an **asset, not an entity**. Entity candidates: `nuclear_warhead` (twitch), `nuke_combined`, `warhead_cable_single`, `door.hinged.bunker.door_nuclear_silo`, `homing_missile_launcher.entity`, `seekertest`. | "No observations." | **Done.** Candidate list below. |
+| R1f | In-scene scan: 225 matches, first 40 listed. Silo monuments `silo_a`, `silo_c`, `silo_c (1)` exist at ~4 550 m, under `junkyard_1`. **No in-world `nuclear_silo_missile` is among the first 40 listed.** Networked bus `nuclear_warhead` spawned at (-2067.61, 6.45, 858.81). Server-side silo missile copy under it: `nuclear_silo_missile(Clone)`, `active=False`, Transform + MeshCollider only. | "I see the MIRV parts of the missle prior to where we will change them to." | **Silo missile body still not seen.** The operator did see the **warhead bus**: MIRV parts are visible on the bus. The bus is a visible, networked, missile-like body. |
+| R7 sweep | `/probe R7` (default radii 0.01–0.25). Observation: "We should test the moving of the marker with 0.025 size." | 0.025 chosen for a moving test | Sweep done. Next: moving marker at 0.025. |
+| R7 move | `/probe R7 move 0.1 25`. Path x −2980 to 2980 along z=0, expected 238 s. Observation: "test this again but sped up even more to simulate missile speed." | 25 m/s is too slow for a missile | Re-run faster (see run 7 plan). |
+| R9 static | 4 plumes spaced 2 m, 5 m north of operator, fixed. | **Confirmed.** |
+| R9 follow ×2 | After `SetParent`, local position was zeroed, so the plumes sat on the operator and merged. | **Bug.** v0.6.0 sets the local offset after parenting, then sends an update. Untested. |
+
+**Operator answers (2026-10-18):** Q1 map size 6000 (unit to confirm, see Part A). Q2 second-player test for R7 is deferred. Marker sizes need tuning.
+
+### Probe protocol v0.6 (applies to ALL future sessions)
+
+- **One session log per session.** `/probe start` opens `carbon/logs/TheatricalNukeProbe/session_<timestamp>.log`. Every probe in the session writes into this file. `/probe end` closes it and writes a summary. Probes refuse to run without an open session.
+- **Start and end banners per probe** are written into the session file, with the R number.
+- **`/probe <ID> end` with no words** runs cleanup, then opens an in-game observation box (CUI). Type the observation (limit 1000 words, about 6000 characters), then press Submit. The box text becomes the OBSERVE line. `/probe <ID> end <words>` still works for chat-only sessions.
+- **Verbose logging:** each probe writes an environment snapshot at start and end, a TICK line every 5 s (operator position and tracked entity state), DEBUG lines for each cleanup item, and full stack traces for errors.
+- Each probe still cleans up after itself, in reverse order of creation.
+
+### Open after run 5
+
+- **Q-A (map size).** Answered: 6000 m × 6000 m.
+- **Q-B (bookmark name).** Answered: `NUKE` + network ID (probe v0.6.1).
+- **Q-C (siren falloff). Answered (2026-10-18):** the siren was audible again at about 2000 m from the spawn point after the operator walked out. Interpretation: audible at about 2000 m, consistent with the 2079 m measurement in run 4. Falloff curve still to be measured (see R6d below).
+- **Q-D (missile body).** Choose option A, B or C (see the carrier section above), or ask for a further test.
+- **Q-E (R7 sizes).** Which radii should the sweep use next? Options: `/probe R7 0.1 0.25 0.5 1`. The probe now takes any radius list.
+
+
+### Build fix — v0.6.0 compile error (CS0103)
+
+`CuiHelper` lives in `Oxide.Game.Rust.Cui` (Carbon `src/Carbon.Components/Carbon.Common/src/Oxide/CUI/CuiHelper.cs`). Added `using Oxide.Game.Rust.Cui;`. Version **0.6.1**. The server was still on v0.5.0 after the failed compile, so the operator needs `c.reload TheatricalNukeProbe` again.
+
+### Missile body — proposed probe sequence (for approval)
+
+Hypothesis from run 5: the silo missile root is **inactive** in its prefab (`active=False`, Transform + MeshCollider only), so it may be a child that a parent entity activates. The parent entity's prefab would then already carry the visual to clients.
+
+1. **R1c — manifest search (read-only, no spawns).** Search `GameManifest.pathToGuid` (all bundled asset paths) for `nuclear`, `silo`, `missile`, `warhead`. For each hit, mark whether it is in `GameManifest.Current.entities` (networked). For networked hits, log the child hierarchy names. Output: a list of candidate entities that could carry the missile.
+2. **R1d — candidate entity visuals.** Spawn the most likely networked parent (from R1c), at the same spot as R1b. Operator reports whether the missile body is visible on it. Cleanup kills it.
+3. **R1e — child toggle replication.** Only if R1d shows the body: check whether toggling the missile child on the server changes what the operator sees. This tests whether a theatrical "launch" is possible at all.
+4. Fallback to options A/B/C from Part E if R1c–R1e find nothing.
+
+Run R1c first. It has no world effect and is the cheapest way to answer the question.
+
+
+### Run 6 plan (probes v0.7.0)
+
+Version **0.7.0**. Adds R1c, R1f, and `/probe R7 move`. Compile fix from 0.6.1 is included. Reload with `c.reload TheatricalNukeProbe`, then `/probe start`.
+
+- **R1c (manifest search, no spawns).** Searches all bundled asset paths for `nuclear`, `silo`, `missile`, `warhead`, `icbm`, `nuke`. For each networked entity prefab it logs the child hierarchy. Reads `GameManifest.pathToGuid` and `GameManifest.Current.entities`, both from the decompile, so a compile error here means those names differ.
+- **R1f (silo parent test).** Part 1 lists transforms in the scene named like the silo or missile, so we know whether the monument missile exists and where. Part 2 spawns the warhead bus as a networked parent and puts a server-side copy of the silo missile under it. Expected result: not visible (as in R1b). If R1c finds an entity that already carries the missile, that entity is the next test.
+- **R7 move.** `/probe R7 move [radius] [m/s]`. One marker, default radius 0.1 and 25 m/s, travels west to east across the whole map along z = 0, one step per second. Report smoothness, lag and whether the map tints.
+- **R6d (not built yet).** Falloff curve for the siren: walk out in 200 m steps and log where it stops and restarts.
+
+Suggested order: R1c → R1f → R7 sweep → R7 move (radius 0.1, 25 m/s) → R9 follow → R6d.
+
+
+### Run 6 — 2026-10-18 (operator session log `session_20261018-141014.txt`, probes v0.8.0)
+
+Log is at `probes/logs/run-6/session_20261018-141014.txt` (copy on commit). Operator: Todd the Wraith, admin, server "Todd's Testing Ground", Procedural Map 6000 m.
+
+| Probe | Result in log | Operator observation | Verdict |
+|---|---|---|---|
+| R1c | 18 671 assets, 2 408 networked entity paths; 118 keyword matches; 6 networked entity prefabs. Silo asset `nuclear_silo_missile.prefab` is an **asset, not an entity**. Entity candidates: `nuclear_warhead` (twitch), `nuke_combined`, `warhead_cable_single`, `door.hinged.bunker.door_nuclear_silo`, `homing_missile_launcher.entity`, `seekertest`. | "No observations." | **Done.** Candidate list below. |
+| R1f | In-scene scan: 225 matches, first 40 listed. Silo monuments `silo_a`, `silo_c`, `silo_c (1)` exist at ~4 550 m, under `junkyard_1`. **No in-world `nuclear_silo_missile` is among the first 40 listed.** Networked bus `nuclear_warhead` spawned at (-2067.61, 6.45, 858.81). Server-side silo missile copy under it: `nuclear_silo_missile(Clone)`, `active=False`, Transform + MeshCollider only. | "I see the MIRV parts of the missle prior to where we will change them to." | **Silo missile body still not seen.** The operator did see the **warhead bus**: MIRV parts are visible on the bus. The bus is a visible, networked, missile-like body. |
+| R7 sweep | Ran (0.01–0.25). Two observations, both about marker speed: 0.025 looks right at moving speed; asked for a faster test "to simulate missile speed". | see log | Speed test needed (R7 move, faster). |
+| R7 move | Ran (0.1, 25 m/s default). Observation: asked for a faster run at 0.025. | see log | Re-run faster. |
+| R9 static | 4 plumes, 2.0 m spacing, centre 5 m in front. Operator: "spawned directly north of the player, not attached, static." | static | **Done**, as intended. |
+| R9 follow | **Probe bug: the follow test did not run.** The log shows `mode=static (not parented)` after `/probe R9 follow`, because the probe read the mode from argument 2 only. Operator: "Using follow the plumes do not follow me." | not a real test | **Fixed in v0.9.0** (mode accepted in any position). **Must be re-run.** |
+| R6 | Siren through `Effect.server.Run`: log "unknown effect" warning. Operator: "Tried to spawn an effect without a EffectRecycle component ... appeared in the client." | | Consistent with run 2/4 (effect route silent). |
+| R6b | Entity siren spawned; operator walked out. Operator's observation gives the position where they stopped hearing it. | (-1567.80, 41.31, -1017.06) | Falloff: R6d still to do. |
+| R6c | Component audit; entity placed 20 m in front; removed on end. | "Unclear what aim of this test was." | Audit only; note the aim was not clear. |
+| R2 | CCTV `NUKE8123533` valid, parented, followed the operator. Operator: "Camera still in correct location, use shortened number that is not the camera's network ID, something." | | Q-B (name length) open: needs a shorter, non-network-ID name. |
+
+**Observation box and `/probe end` (v0.8.0): confirmed in use.** The box accepted text, Submit saved it, and the queue advanced. Session close after the last observation is still to be seen.
+
+#### Missile body — options after R1c and R1f
+
+Evidence:
+1. The silo missile prefab is an asset with no `BaseEntity`. Its server-side copy under a networked parent has only a `MeshCollider` (R1f). No renderer reaches the server, so a copy cannot carry the body (R1b, R1f).
+2. The operator saw **MIRV parts on the warhead bus** (R1f). The bus is therefore a networked entity whose client prefab has visible geometry. That is option A from the carrier section, and it now has evidence.
+3. No in-world silo missile was listed in R1f's first 40 matches. The full list was not printed, so this is not yet proven.
+4. Candidate networked entities with missile-like children (R1c): `nuke_combined` (child `nuclear_warhead` with `MeshRenderer` and LODs, plus a nested `BaseEntity` child `nuclear_warhead`), `nuclear_warhead` (the bus, visible), `homing_missile_launcher` (launcher, not a missile).
+
+Options:
+- **A1. Use the warhead bus as the body.** It already shows MIRV parts. Visible with no client content. Cost: the shape is a warhead, not the silo missile. Check: does the look fit the theatre? (operator question)
+- **A2. Use `nuke_combined` as the body.** Its client prefab has a renderer child `nuclear_warhead` and a nested entity child. Needs its own visual probe (R1d-style) before use.
+- **A3. Toggle parts of a networked entity (R1e).** If server-side `SetActive` on a child replicates, the bus can hide its MIRV parts and show a different part. If it does not replicate, A3 is closed and the choice falls to A1, A2 or B.
+- **B. A visible vanilla rocket entity** (`rocket_basic`, `rocket_hv`, `rocket_fire`). Visible, but generic; the theatre is weaker.
+- **C. Ship a client content bundle with the missile.** Rejected by the server-only rule. Needs an explicit decision to relax it.
+- **D (not yet tested). Find an in-world silo missile.** Run a full list of scene transforms named `missile` near the silo monuments. If one exists and is visible, it is already in the world and needs no spawn.
+
+#### Run 7 plan (probes v0.9.0)
+
+- **R1e (child toggle on the warhead bus).** `/probe R1e [child name]`, default `nuclear_warhead`. Spawns the bus 14 m in front and lists every child with renderer and collider flags. At 10 s the chosen child is `SetActive(false)` and the bus is updated; at 25 s it is shown again. The operator reports at each step whether the view changes. Cleanup restores the child, then kills the bus.
+- **R9 follow (re-run).** `/probe R9 2 follow`. Must be run because the run-6 follow test did not happen.
+- **R7 move, faster.** `/probe R7 move 0.025 60`. The operator asked for the moving marker at 0.025 and for a speed closer to a missile. Speed 60 m/s is a proposal; confirm with the operator.
+- **R6d (still not built).** Siren falloff, as before.
+- **Missile options A1, A2, A3, D.** Decide after R1e results and the operator's answer on whether the MIRV bus fits the theatre.
+
+Suggested order: R1e → R9 follow → R7 move 0.025 60 → R6d.
