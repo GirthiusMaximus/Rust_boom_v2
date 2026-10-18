@@ -632,3 +632,27 @@ Options:
 - **Missile options A1, A2, A3, D.** Decide after R1e results and the operator's answer on whether the MIRV bus fits the theatre.
 
 Suggested order: R1e → R9 follow → R7 move 0.025 60 → R6d.
+
+#### Initial missile on ascent and boost: requirement (operator, run 7)
+
+The initial missile on ascent and boost **must use `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab`**. No substitute body (warhead bus, rocket, or other entity) is acceptable for this shot. R1 must explore every avenue that could put this prefab in front of a client. Each avenue is its own probe command.
+
+#### R1 avenues (probes v0.10.0)
+
+| Avenue | Probe | Server handle | Status |
+|---|---|---|---|
+| Entity spawn of the silo prefab | R1 | CreateEntity | Failed: null, not an entity (runs 1 and 6). |
+| Server child under a networked carrier | R1b, R1f | Yes | Failed: server child is not networked; invisible. |
+| Effect route, one shot | **R1g** `go` | **None** | Untested. Client instantiates bundled prefabs for effects (the siren appeared on the client in run 6). |
+| Effect route, stepped ascent | **R1h** `go` | **None** | Untested. Six copies 10 m apart, 1 s apart. Tests whether repeated spawns read as a rising missile. |
+| Silo instance already in the world | **R1i** | Read-only | Untested. Lists every transform containing `missile`. |
+| Server prefab hierarchy | **R1j** | Read-only | Confirms whether the server copy is a root-only stub (R1b and R1f suggest it is). |
+| Networked entity with a missile-like child | **R1k** | Read-only | Untested. Scans all networked entity prefabs for missile, silo, icbm, warhead or rocket children. |
+| BaseEntity injected into a copy | **R1m** | Yes (Track) | Untested. Not an API verified in Carbon or Rust source; this probe checks what the runtime does. |
+| Carrier with the silo body as a client-side child | none | — | Closed by R1b and R1f unless R1k finds a carrier. |
+
+**Limitation on R1g and R1h.** Effect spawns have no server handle. Cleanup cannot remove them. Each run leaves client objects until a server restart. Both probes need `go` and print a warning first.
+
+**Known gap.** The server copy of the silo missile has no visual children (R1b, R1f: root and MeshCollider only). The client's visual children are unknown until a probe shows them. R1g and R1h are the only avenues that let the client build the full prefab.
+
+**Run 7 order:** R1i → R1j → R1k (all read-only) → R1g `go` → R1h `go` → R1m. Stop after each one and read the result before the next.

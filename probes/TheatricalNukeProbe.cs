@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.9.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.10.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -17,7 +17,7 @@
 //   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
 //   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R1c R1e R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.9.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.10.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.9.0";
+    private const string Version = "0.10.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -269,10 +269,11 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
-        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
+        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -433,6 +434,12 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1b": ProbeR1b(run, op); break;
                 case "R1c": ProbeR1c(run, op); break;
                 case "R1e": ProbeR1e(run, op); break;
+                case "R1g": ProbeR1g(run, op); break;
+                case "R1h": ProbeR1h(run, op); break;
+                case "R1i": ProbeR1i(run, op); break;
+                case "R1j": ProbeR1j(run, op); break;
+                case "R1k": ProbeR1k(run, op); break;
+                case "R1m": ProbeR1m(run, op); break;
                 case "R1f": ProbeR1f(run, op); break;
                 case "R2": ProbeR2(run, op); break;
                 case "R3": ProbeR3(run, op); break;
@@ -1431,6 +1438,250 @@ public class TheatricalNukeProbe : CarbonPlugin
         }
     }
 
+    // ── R1 avenues (run 7): every route we know that could put nuclear_silo_missile.prefab in front of a client ─
+    // Avenue                              Probe     Server handle / cleanup
+    // entity spawn                        R1        CreateEntity (null, run 1 and run 6)
+    // server child under a carrier        R1b, R1f  yes, but the child is not networked (invisible)
+    // effect route, one shot              R1g       NONE. Client object may persist. Needs "go".
+    // effect route, stepped ascent        R1h       NONE. Client objects may persist. Needs "go".
+    // scene instance already in world     R1i       read-only
+    // server prefab hierarchy audit       R1j       read-only
+    // networked entity with a missile child  R1k    read-only
+    // BaseEntity injected into a copy     R1m       yes (Track)
+
+    private static readonly string[] MissileChildWords = { "missile", "silo", "icbm", "warhead", "rocket" };
+
+    // R1g: one Effect.server.Run of the silo missile at 14 m in front, ground level. Clients instantiate
+    // any bundled prefab for an effect (run 6: the siren appeared on the client). Gated by "go" because
+    // the effect has no server handle, so cleanup cannot remove a client object.
+    private void ProbeR1g(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        if (!HasGo(run)) return;
+
+        var pos = InFront(p, 14f, 0f);
+        Line(run, "STEP", $"Effect.server.Run('{MissilePrefab}') at {Pos(pos)} ({Dist(pos, p):0.0} m from operator), normal up, useRpc true");
+        Effect.server.Run(MissilePrefab, pos, Vector3.up, null, true);
+        Line(run, "NOTE", "Effect route has no server handle: no entity, no Kill(). A client object may persist after this probe. Cleanup cannot remove it; a server restart clears it.");
+        Line(run, "RESULT", "Check the console for 'unknown effect' or 'EffectRecycle' lines within 2 s. Operator: stand 30 m away and look 14 m in front at about 0 m. " +
+                            "Report: is the silo missile body visible? Its shape, orientation, colour, and whether it is the full silo missile. Walk around it and report any change.");
+    }
+
+    // R1h: the same effect route, six spawns 10 m apart up a vertical line, one second apart. Tests whether
+    // repeated effect spawns read as a rising missile. Gated by "go". Each spawn is a permanent client object.
+    private void ProbeR1h(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        if (!HasGo(run)) return;
+
+        var basePos = InFront(p, 14f, 0f);
+        Line(run, "STEP", $"stepped ascent: 6 effect spawns of '{MissilePrefab}' from {Pos(basePos)} upward, 10 m apart, 1 s apart");
+        Line(run, "NOTE", "Each spawn is a permanent client object with no server handle. Expect 6 persistent copies until a server restart.");
+
+        for (var i = 0; i < 6; i++)
+        {
+            var step = i;
+            timer.Once(step * 1f, () =>
+            {
+                try
+                {
+                    if (run.Ended) return;
+                    var pos = basePos + Vector3.up * (step * 10f);
+                    Effect.server.Run(MissilePrefab, pos, Vector3.up, null, true);
+                    Line(run, "STEP", $"stepped ascent {step + 1}/6: effect submitted at {Pos(pos)} (height +{step * 10f:0} m)");
+                }
+                catch (Exception ex)
+                {
+                    ErrorLog(run, "R1h step " + step, ex);
+                }
+            });
+        }
+
+        Line(run, "RESULT", "Operator: look 14 m in front and watch for 8 s. Report: one missile, a column of copies, or nothing. Give the heights you can see.");
+    }
+
+    // R1i: searches every transform in the scene for 'missile'. Silo monuments are in the scene (R1f), so an
+    // in-world missile would already be on clients. Read-only. Logs root, path, active state and component names.
+    private void ProbeR1i(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 30f;
+        var transforms = UnityEngine.Object.FindObjectsOfType<Transform>();
+        var hits = new List<Transform>();
+        foreach (var t in transforms)
+        {
+            if (t == null) continue;
+            if (t.name != null && t.name.IndexOf("missile", StringComparison.OrdinalIgnoreCase) >= 0) hits.Add(t);
+        }
+
+        Line(run, "SCENE", $"scanned {transforms.Length} transform(s); names containing 'missile': {hits.Count}");
+        foreach (var t in hits.OrderBy(h => Dist(h.position, p)))
+        {
+            var root = t.root != null ? t.root.name : "none";
+            var comps = t.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name);
+            Line(run, "SCENE", $"'{t.name}' root='{root}' path={PathUnder(t, t.root)} pos={Pos(t.position)} dist={Dist(t.position, p):0.0} m " +
+                               $"activeSelf={t.gameObject.activeSelf} activeInHierarchy={t.gameObject.activeInHierarchy} components=[{string.Join(", ", comps)}]");
+        }
+
+        Line(run, "RESULT", $"{hits.Count} in-scene transform(s) named missile. Read the SCENE lines. If one is the silo missile and is visible, we can already see it. " +
+                            "Report whether any visible missile is near the silo monuments.");
+    }
+
+    // R1j: hierarchy of the server copy of the silo missile prefab, with component names. Read-only.
+    // Run 5 and R1f reported the server copy as a single transform with a MeshCollider. This confirms it.
+    private void ProbeR1j(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 30f;
+        var go = GameManager.server.FindPrefab(MissilePrefab);
+        if (go == null)
+        {
+            Line(run, "RESULT", "FindPrefab returned null for the silo missile.");
+            return;
+        }
+
+        var rootComps = go.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name);
+        Line(run, "STEP", $"root '{go.name}' active={go.activeSelf} components=[{string.Join(", ", rootComps)}]");
+
+        var transforms = go.GetComponentsInChildren<Transform>(true);
+        Line(run, "STEP", $"transforms including root: {transforms.Length}; children: {transforms.Length - 1}");
+        foreach (var t in transforms)
+        {
+            if (t == null || t == go.transform) continue;
+            var comps = t.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name);
+            Line(run, "DETAIL", $"child '{t.name}' path={PathUnder(t, go.transform)} active={t.gameObject.activeSelf} [{string.Join(", ", comps)}]");
+        }
+
+        var allComps = go.GetComponentsInChildren<Component>(true).Where(c => c != null).Select(c => c.GetType().Name).ToList();
+        Line(run, "STEP", $"component types in whole hierarchy: {allComps.Count}; distinct: {string.Join(", ", allComps.Distinct())}");
+        Line(run, "RESULT", transforms.Length <= 1
+            ? "Server copy is a stub: root only. The client prefab's visual children are unknown to the server."
+            : $"Server copy has {transforms.Length - 1} child transform(s). Read the DETAIL lines for the body mesh.");
+    }
+
+    // R1k: every networked entity prefab (manifest.entities), scanned for a child whose name looks like a missile.
+    // Read-only, no spawns. Any hit is a candidate carrier that already holds a missile-like child on clients.
+    private void ProbeR1k(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 240f;
+        var manifest = GameManifest.Current;
+        if (manifest == null || manifest.entities == null)
+        {
+            Line(run, "RESULT", "GameManifest.Current or its entity list is null. Cannot scan.");
+            return;
+        }
+
+        var entityPaths = manifest.entities.Where(s => !string.IsNullOrEmpty(s)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(s => s, StringComparer.OrdinalIgnoreCase).ToList();
+        Line(run, "SCAN", $"networked entity paths: {entityPaths.Count}; child words: {string.Join(", ", MissileChildWords)}");
+
+        var scanned = 0;
+        var withChildren = 0;
+        var hits = 0;
+        foreach (var path in entityPaths)
+        {
+            try
+            {
+                var go = GameManager.server.FindPrefab(path);
+                scanned++;
+                if (go == null) continue;
+
+                var transforms = go.GetComponentsInChildren<Transform>(true);
+                if (transforms.Length > 1) withChildren++;
+
+                foreach (var t in transforms)
+                {
+                    if (t == null || t == go.transform) continue;
+                    if (!MissileChildWords.Any(w => t.name.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+
+                    hits++;
+                    Line(run, "HIT", $"{path} :: child '{t.name}' path={PathUnder(t, go.transform)} active={t.gameObject.activeSelf}");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLog(run, "R1k " + path, ex);
+            }
+        }
+
+        Line(run, "RESULT", $"scanned {scanned} entity prefab(s); {withChildren} have children; {hits} missile-like child hit(s). " +
+                            "Note: the server copy of the silo missile is a stub (R1j), so this scan sees only what the server prefab exposes.");
+    }
+
+    // R1m: component injection. A server copy of the silo missile gets a BaseEntity component added, then Spawn().
+    // Not an API we have verified in Carbon or Rust source; this probe checks what the runtime does. Cleanup removes
+    // the copy, and the entity is killed if it spawned.
+    private void ProbeR1m(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        var prefab = GameManager.server.FindPrefab(MissilePrefab);
+        if (prefab == null)
+        {
+            Line(run, "RESULT", "FindPrefab returned null for the silo missile.");
+            return;
+        }
+
+        var pos = InFront(p, 14f, 1f);
+        GameObject copy = null;
+        try
+        {
+            copy = UnityEngine.Object.Instantiate(prefab, pos, Quaternion.identity);
+            Line(run, "STEP", $"instantiated copy '{copy.name}' at {Pos(pos)}");
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "R1m instantiate", ex);
+            Line(run, "RESULT", $"Instantiate threw {ex.GetType().Name}: {ex.Message}");
+            return;
+        }
+
+        var holder = copy;
+        run.Cleanup.Add(new CleanupItem
+        {
+            Label = "destroy injected copy",
+            Run = () =>
+            {
+                if (holder == null) return "already null";
+                UnityEngine.Object.Destroy(holder);
+                return "destroyed";
+            },
+        });
+
+        try
+        {
+            var entity = copy.AddComponent<BaseEntity>();
+            Line(run, "STEP", $"AddComponent<BaseEntity> returned {(entity != null ? "non-null" : "null")}");
+            if (entity == null)
+            {
+                Line(run, "RESULT", "AddComponent gave null. Injection route is closed.");
+                return;
+            }
+
+            try
+            {
+                entity.Spawn();
+                Track(run, entity, "injected silo missile entity");
+                Line(run, "STEP", $"Spawn() returned; IsDestroyed={entity.IsDestroyed} net={(entity.net != null ? entity.net.ID : 0u)}");
+                Line(run, "RESULT", "Injected entity spawned. Operator: look 14 m in front at about 1 m. Report whether the silo missile body is visible.");
+            }
+            catch (Exception ex)
+            {
+                ErrorLog(run, "R1m spawn", ex);
+                Line(run, "RESULT", $"Spawn threw {ex.GetType().Name}: {ex.Message}. Route closed unless the message suggests otherwise.");
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "R1m AddComponent", ex);
+            Line(run, "RESULT", $"AddComponent<BaseEntity> threw {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private bool HasGo(ProbeRun run)
+    {
+        if (run.Args.Length > 0 && run.Args[0].Equals("go", StringComparison.OrdinalIgnoreCase)) return true;
+        Line(run, "RESULT", "Not run. This route leaves client objects with no server handle, so cleanup cannot remove them. " +
+                            "Run it again with 'go': /probe " + run.Id + " go");
+        return false;
+    }
+
     // ── R1f: in-world silo search, then a server-side silo copy under a different networked parent ─
     // Part 1 lists transforms in the scene named like the silo or missile (the monument, if present).
     // Part 2 spawns the warhead bus as a normal networked parent, puts a server-side copy of the silo
@@ -1546,8 +1797,8 @@ public class TheatricalNukeProbe : CarbonPlugin
         {
             if (t == null || t == bus.transform) continue;
 
-            var hasRenderer = t.GetComponent<Renderer>() != null;
-            var hasCollider = t.GetComponent<Collider>() != null;
+            var hasRenderer = HasComponentNamed(t, "Renderer");
+            var hasCollider = HasComponentNamed(t, "Collider");
             Line(run, "CHILD", $"'{t.name}' path={PathUnder(t, bus.transform)} activeSelf={t.gameObject.activeSelf} " +
                                $"activeInHierarchy={t.gameObject.activeInHierarchy} renderer={hasRenderer} collider={hasCollider} " +
                                $"local={Pos(t.localPosition)}");
@@ -1571,7 +1822,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         var original = target.gameObject.activeSelf;
         var targetName = target.name;
         var targetPath = PathUnder(target, bus.transform);
-        Line(run, "STEP", $"target '{targetName}' path={targetPath} activeSelf before={original} renderer={target.GetComponent<Renderer>() != null}");
+        Line(run, "STEP", $"target '{targetName}' path={targetPath} activeSelf before={original} renderer={HasComponentNamed(target, "Renderer")}");
 
         // Cleanup order is reverse, so this runs before the bus is killed.
         run.Cleanup.Add(new CleanupItem
@@ -1631,6 +1882,16 @@ public class TheatricalNukeProbe : CarbonPlugin
         {
             ErrorLog(run, "R1e " + phase, ex);
         }
+    }
+
+    private static bool HasComponentNamed(Transform t, string fragment)
+    {
+        foreach (var c in t.GetComponents<Component>())
+        {
+            if (c != null && c.GetType().Name.IndexOf(fragment, StringComparison.OrdinalIgnoreCase) >= 0) return true;
+        }
+
+        return false;
     }
 
     private static string PathUnder(Transform t, Transform root)
