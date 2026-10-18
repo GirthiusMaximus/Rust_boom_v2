@@ -495,7 +495,7 @@ Logs are in `/home/user/probe_logs_run5/` (copy to `probes/logs/run-5/` on commi
 
 - **Q-A (map size).** Answered: 6000 m × 6000 m.
 - **Q-B (bookmark name).** Answered: `NUKE` + network ID (probe v0.6.1).
-- **Q-C (siren falloff).** Did the siren stop being audible as you walked out, and at what distance? Please re-run R6b with a note of the distance.
+- **Q-C (siren falloff). Answered (2026-10-18):** the siren was audible again at about 2000 m from the spawn point after the operator walked out. Interpretation: audible at about 2000 m, consistent with the 2079 m measurement in run 4. Falloff curve still to be measured (see R6d below).
 - **Q-D (missile body).** Choose option A, B or C (see the carrier section above), or ask for a further test.
 - **Q-E (R7 sizes).** Which radii should the sweep use next? Options: `/probe R7 0.1 0.25 0.5 1`. The probe now takes any radius list.
 
@@ -514,3 +514,15 @@ Hypothesis from run 5: the silo missile root is **inactive** in its prefab (`act
 4. Fallback to options A/B/C from Part E if R1c–R1e find nothing.
 
 Run R1c first. It has no world effect and is the cheapest way to answer the question.
+
+
+### Run 6 plan (probes v0.7.0)
+
+Version **0.7.0**. Adds R1c, R1f, and `/probe R7 move`. Compile fix from 0.6.1 is included. Reload with `c.reload TheatricalNukeProbe`, then `/probe start`.
+
+- **R1c (manifest search, no spawns).** Searches all bundled asset paths for `nuclear`, `silo`, `missile`, `warhead`, `icbm`, `nuke`. For each networked entity prefab it logs the child hierarchy. Reads `GameManifest.pathToGuid` and `GameManifest.Current.entities`, both from the decompile, so a compile error here means those names differ.
+- **R1f (silo parent test).** Part 1 lists transforms in the scene named like the silo or missile, so we know whether the monument missile exists and where. Part 2 spawns the warhead bus as a networked parent and puts a server-side copy of the silo missile under it. Expected result: not visible (as in R1b). If R1c finds an entity that already carries the missile, that entity is the next test.
+- **R7 move.** `/probe R7 move [radius] [m/s]`. One marker, default radius 0.1 and 25 m/s, travels west to east across the whole map along z = 0, one step per second. Report smoothness, lag and whether the map tints.
+- **R6d (not built yet).** Falloff curve for the siren: walk out in 200 m steps and log where it stops and restarts.
+
+Suggested order: R1c → R1f → R7 sweep → R7 move (radius 0.1, 25 m/s) → R9 follow → R6d.

@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.6.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.7.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -15,7 +15,7 @@
 //   /probe <ID> end <words>       end it with the observation typed in chat instead (no box).
 //   /probe end                    close the session log (refused while a probe or box is open).
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -39,11 +39,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.6.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.7.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.6.0";
+    private const string Version = "0.7.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -63,8 +63,8 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b" };
-    private static readonly float[] MarkerRadii = { 0.5f, 1f, 2f, 3f, 5f };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1f" };
+    private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
     private static bool _r5Armed;
@@ -234,9 +234,10 @@ public class TheatricalNukeProbe : CarbonPlugin
     {
         player.ChatMessage("Session: /probe start (open the session log)   /probe end (close it)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (opens an observation box)");
-        player.ChatMessage("Probes: R0 R1 R1b R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
-        player.ChatMessage("R7 [radius ...] (default 0.5 1 2 3 5)   R9 [spacing] [static|follow]   R1b (carrier test)");
+        player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
+        player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1f (silo parent test)");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -373,6 +374,8 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R0": ProbeR0(run, op); break;
                 case "R1": ProbeR1(run, op); break;
                 case "R1b": ProbeR1b(run, op); break;
+                case "R1c": ProbeR1c(run, op); break;
+                case "R1f": ProbeR1f(run, op); break;
                 case "R2": ProbeR2(run, op); break;
                 case "R3": ProbeR3(run, op); break;
                 case "R4": ProbeR4(run, op); break;
@@ -1045,8 +1048,87 @@ public class TheatricalNukeProbe : CarbonPlugin
     }
 
     // ── R7: marker radius sweep (units and visibility) ───────────────────────────────────────────
+    // ── R7 move: one marker of a chosen radius travels west to east across the whole map ────────
+    // Usage: /probe R7 move [radius, default 0.1] [speed m/s, default 25]
+    // The marker starts at the west edge (worldsize / 2 - 20 m) and moves along z = 0 to the east edge, one step per second.
+    private void ProbeR7Move(ProbeRun run, BasePlayer p)
+    {
+        var radius = (run.Args.Length > 1 ? ParseFloat(run.Args, 1) : null) ?? 0.1f;
+        var speed = (run.Args.Length > 2 ? ParseFloat(run.Args, 2) : null) ?? 25f;
+
+        if (radius <= 0f || radius > 60f || speed <= 0f || speed > 200f)
+        {
+            Line(run, "RESULT", $"invalid radius={radius} or speed={speed}. Radius 0-60, speed 0-200 m/s.");
+            return;
+        }
+
+        var size = (float)ConVar.Server.worldsize;
+        var half = size / 2f - 20f;
+        var y = p.transform.position.y;
+        var start = new Vector3(-half, y, 0f);
+        var end = new Vector3(half, y, 0f);
+        var seconds = (end.x - start.x) / speed;
+        run.TimeoutSeconds = seconds + 60f;
+
+        var marker = GameManager.server.CreateEntity(MarkerPrefab, start, Quaternion.identity) as MapMarkerGenericRadius;
+        if (marker == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null or not a MapMarkerGenericRadius.");
+            return;
+        }
+
+        marker.color1 = new Color(1f, 0.20f, 0.85f, 1f);
+        marker.color2 = new Color(1f, 0.20f, 0.85f, 1f);
+        marker.alpha = 0.55f;
+        marker.radius = radius;
+        marker.Spawn();
+        marker.SendUpdate();
+        Track(run, marker, "moving marker");
+
+        Line(run, "STEP", $"moving marker spawned at {Pos(start)} radius={radius} speed={speed} m/s");
+        Line(run, "STEP", $"map worldsize={size} m; path x from {-half:0} to {half:0} along z=0; expected {seconds:0} s");
+        ScheduleMove(run, marker, start, end, speed, 0f);
+    }
+
+    private void ScheduleMove(ProbeRun run, MapMarkerGenericRadius marker, Vector3 start, Vector3 end, float speed, float elapsed)
+    {
+        timer.Once(1f, () =>
+        {
+            try
+            {
+                if (run.Ended || marker == null || marker.IsDestroyed) return;
+
+                var t = elapsed + 1f;
+                var x = Mathf.Min(start.x + speed * t, end.x);
+                var pos = new Vector3(x, start.y, start.z);
+                marker.transform.position = pos;
+                marker.SendNetworkUpdateImmediate();
+                Line(run, "MOVE", $"t=+{t:0.0}s marker at {Pos(pos)}");
+
+                if (x < end.x)
+                {
+                    ScheduleMove(run, marker, start, end, speed, t);
+                }
+                else
+                {
+                    Line(run, "RESULT", $"marker reached the east edge at t=+{t:0.0}s. Report: smooth or jerky, lag behind you, whether the whole map tinted, and whether it stayed visible throughout.");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLog(run, "R7 move step", ex);
+            }
+        });
+    }
+
     private void ProbeR7(ProbeRun run, BasePlayer p)
     {
+        if (run.Args.Length > 0 && run.Args[0].Equals("move", StringComparison.OrdinalIgnoreCase))
+        {
+            ProbeR7Move(run, p);
+            return;
+        }
+
         var radii = ParseRadii(run);
         if (radii.Length == 0)
         {
@@ -1117,6 +1199,167 @@ public class TheatricalNukeProbe : CarbonPlugin
         }
 
         return list.ToArray();
+    }
+
+    // ── R1c: manifest search (read-only, no spawns) ─────────────────────────────────────────────
+    // Lists every bundled asset path that looks like the silo, missile or warhead. For networked entity
+    // prefabs it logs the child hierarchy, so we can see whether an entity already carries a missile child.
+    private void ProbeR1c(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 120f;
+        var keywords = new[] { "nuclear", "silo", "missile", "warhead", "icbm", "nuke" };
+
+        var manifest = GameManifest.Current;
+        if (manifest == null)
+        {
+            Line(run, "RESULT", "GameManifest.Current is null. Cannot search.");
+            return;
+        }
+
+        var entityPaths = new HashSet<string>(manifest.entities ?? new string[0], StringComparer.OrdinalIgnoreCase);
+        var allPaths = GameManifest.pathToGuid.Keys.ToList();
+        Line(run, "SCAN", $"manifest: {allPaths.Count} asset path(s), {entityPaths.Count} networked entity path(s)");
+        Line(run, "SCAN", $"keywords: {string.Join(", ", keywords)}");
+
+        var matches = allPaths
+            .Where(path => keywords.Any(k => path.IndexOf(k, StringComparison.OrdinalIgnoreCase) >= 0))
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Line(run, "SCAN", $"matches: {matches.Count}");
+
+        var networkedCount = 0;
+        foreach (var path in matches)
+        {
+            var networked = entityPaths.Contains(path);
+            Line(run, "MATCH", $"{(networked ? "ENTITY" : "asset ")} {path}");
+
+            if (!networked) continue;
+
+            networkedCount++;
+            DumpPrefabHierarchy(run, path);
+        }
+
+        Line(run, "RESULT", $"{matches.Count} match(es), {networkedCount} networked entity prefab(s). " +
+                            "Read the ENTITY lines and their child names. A child named like the missile on an entity is the lead to test.");
+    }
+
+    private void DumpPrefabHierarchy(ProbeRun run, string path)
+    {
+        try
+        {
+            var go = GameManager.server.FindPrefab(path);
+            if (go == null)
+            {
+                Line(run, "DETAIL", $"  FindPrefab returned null for {path}");
+                return;
+            }
+
+            var rootTypes = go.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name);
+            Line(run, "DETAIL", $"  root '{go.name}' active={go.activeSelf} components=[{string.Join(", ", rootTypes)}]");
+
+            var transforms = go.GetComponentsInChildren<Transform>(true);
+            var shown = 0;
+            foreach (var t in transforms)
+            {
+                if (t == null || t == go.transform) continue;
+
+                if (shown >= 60)
+                {
+                    Line(run, "DETAIL", $"  ... {transforms.Length - 1 - shown} more child transform(s) not listed");
+                    break;
+                }
+
+                var childTypes = t.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name);
+                Line(run, "DETAIL", $"  child '{t.name}' active={t.gameObject.activeSelf} [{string.Join(", ", childTypes)}]");
+                shown++;
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "R1c hierarchy " + path, ex);
+        }
+    }
+
+    // ── R1f: in-world silo search, then a server-side silo copy under a different networked parent ─
+    // Part 1 lists transforms in the scene named like the silo or missile (the monument, if present).
+    // Part 2 spawns the warhead bus as a normal networked parent, puts a server-side copy of the silo
+    // missile under it, and asks the operator to look. Expected: the copy is NOT visible (as in R1b).
+    private void ProbeR1f(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 180f;
+
+        var missile = GameManager.server.FindPrefab(MissilePrefab);
+        if (missile == null)
+        {
+            Line(run, "RESULT", "FindPrefab returned null for the missile.");
+            return;
+        }
+
+        var transforms = UnityEngine.Object.FindObjectsOfType<Transform>();
+        var hits = 0;
+        foreach (var t in transforms)
+        {
+            if (t == null) continue;
+            var name = t.name ?? string.Empty;
+            if (name.IndexOf("silo", StringComparison.OrdinalIgnoreCase) < 0 &&
+                name.IndexOf("missile", StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+            hits++;
+            if (hits <= 40)
+            {
+                var parentName = t.parent != null ? t.parent.name : "none";
+                Line(run, "SCENE", $"'{name}' pos={Pos(t.position)} dist={Dist(t.position, p):0.0} m " +
+                                   $"activeSelf={t.gameObject.activeSelf} activeInHierarchy={t.gameObject.activeInHierarchy} parent='{parentName}'");
+            }
+        }
+
+        Line(run, "SCENE", $"scanned {transforms.Length} transform(s); matches={hits}" +
+                           (hits > 40 ? " (first 40 listed)" : string.Empty));
+
+        var busPos = InFront(p, 14f, 2f);
+        var bus = GameManager.server.CreateEntity(BusPrefab, busPos, Quaternion.identity);
+        if (bus == null)
+        {
+            Line(run, "RESULT", $"CreateEntity returned null for {BusPrefab}. Part 2 not run.");
+            return;
+        }
+
+        bus.Spawn();
+        Track(run, bus, "networked parent");
+        Line(run, "STEP", $"networked parent {bus.GetType().Name} spawned at {Pos(busPos)} (net id {(bus.net != null ? bus.net.ID : 0u)})");
+        AuditComponents(run, bus.gameObject, "parent live");
+
+        GameObject visual = null;
+        try
+        {
+            visual = UnityEngine.Object.Instantiate(missile, bus.transform);
+            visual.transform.localPosition = Vector3.zero;
+            visual.transform.localRotation = Quaternion.identity;
+            Line(run, "STEP", $"server-side silo missile copy created under '{bus.transform.name}' world={Pos(visual.transform.position)}");
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "R1f instantiate", ex);
+            Line(run, "STEP", $"Instantiate threw {ex.GetType().Name}: {ex.Message}");
+        }
+
+        if (visual != null)
+        {
+            var copy = visual;
+            run.Cleanup.Add(new CleanupItem
+            {
+                Label = "destroy server-side silo missile copy",
+                Run = () =>
+                {
+                    UnityEngine.Object.Destroy(copy);
+                    return "destroyed";
+                },
+            });
+            AuditVisuals(run, visual, "server-side copy");
+        }
+
+        Line(run, "RESULT", "Operator: stand 30 m away and look 14 m in front of you at about 1 m height, then report whether you see the missile body. " +
+                            "Expected: NO. If SCENE listed an in-world silo missile, also go to its position and report whether it is visible there.");
     }
 
     // ── R8: bus prefab visibility ────────────────────────────────────────────────────────────────

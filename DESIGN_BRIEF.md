@@ -2,7 +2,7 @@
 
 > **Product:** Theatrical Nuke
 > **Artifact:** Carbon plugin (`.cs`, server-side only)
-> **Status:** **Draft v0.3 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
+> **Status:** **Draft v0.5 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
 > Storyboard is intentionally incomplete past the terminal phase.
 > **Last updated:** 2026-10-17
 >
@@ -693,6 +693,7 @@ amended if reality disagreed.
 | 0.2 | 2026-10-17 | Probe run 2: siren path corrected (`air raid`); R3, R8, R5 plane confirmed; R2 identifier duplicates; R7 marker tinted the whole map; R9 plumes need the `generation` neutering. Operator answers recorded (Q1–Q12). Probe run 1: missile not an entity (R1), siren not playable via effects (R6), bus spawns (R8), supply intercept works (R5). Sirens become pulse-based anchors; marker strategy changed after verifying MLRS markers are owner-only; asset register filled; Q13–Q18 remain; FX research pass gated into M5. | Build agent |
 | 0.3 | 2026-10-18 | Probe run 5 (v0.5.0 logs): R1b carrier test: a bare networked carrier spawns, and a server-side missile copy under it is not reported as visible (operator saw nothing; M0 Part E); R2 NUKECAM identifier works and the feed shows our camera; R5 confirmed: smoke 15 s, no cargo plane; R9 static plumes correct, follow mode merged onto the operator (fixed in v0.6.0, untested); R7 0.5 m is about one grid cell. Map size recorded as 6000 (unit to confirm; now confirmed 6000 m, see 0.4). Probe protocol v0.6: one session log, observation box on `/probe <ID> end`. | Build agent |
 | 0.4 | 2026-10-18 | Operator answers: map is 6000 m × 6000 m (Q-A). CCTV bookmark identifier is `NUKE` + network ID (Q-B), set in probe v0.6.1. Probe v0.6.1 fixes a compile error (missing `Oxide.Game.Rust.Cui` using for `CuiHelper`). Missile body remains open (R1b: server-side copy invisible). | Build agent |
+| 0.5 | 2026-10-18 | Operator answers: siren audible again at about 2000 m from spawn (Q-C). R7 sweep set to 0.01–0.25 (Q-E). Probe v0.7.0 adds R1c manifest search, R1f silo parent test, R7 move (moving marker). Missile body route still open; R1c/R1f decide between a networked parent that already carries the missile, and options A/B/C. | Build agent |
 
 ---
 
