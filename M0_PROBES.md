@@ -702,3 +702,5 @@ Position used for runs 8 to 11: operator about (-2065 to -2068, 15.5 to 16.2, 45
 **Run 12 operator observations (follow-up):** R1o: "I saw the bus but no missle." R1t: "nothing spawned" (consistent with the null return from CreateEntity).
 
 **Observation box truncation (open bug):** R1o's observation was cut at 69 characters. Cause not yet confirmed. v0.11.8 adds `/probe more <text>` to append the rest of an observation (logged as OBSERVE-MORE), and `/probe boxtest` to find where the box cuts a numbered test string.
+
+**Client console evidence (run 12 testing, reported by operator):** three times, "Tried to spawn an effect without a EffectRecycle component (assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab)". The client rejects the silo prefab as an effect because it has no `EffectRecycle` component. This explains the effect-route results (R1g, R1h, R1o). The effect route is closed for this prefab, and the rejection is on the client's asset, which the server cannot change.
