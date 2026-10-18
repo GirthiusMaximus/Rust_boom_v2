@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.7.0.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.8.0.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -8,12 +8,14 @@
 // AudioSource is NOT referenced by type (AudioModule is not in the plugin reference set); it is read by reflection.
 // If Carbon reports a compile error, those lines are the first suspects.
 //
-// PROTOCOL (v0.6, one session log per session):
+// PROTOCOL (v0.8, one session log per session):
 //   /probe start                  open the session log. Required before any probe.
 //   /probe <ID> [args]            start a probe. Everything it does is written to the session log.
-//   /probe <ID> end               end it, run cleanup, then open an observation box. Type, press Submit.
-//   /probe <ID> end <words>       end it with the observation typed in chat instead (no box).
-//   /probe end                    close the session log (refused while a probe or box is open).
+//   /probe <ID> end               end it and run cleanup. No observation yet, so it is queued and the box opens on /probe end.
+//   /probe <ID> end <words>       end it with the observation typed in chat (no box).
+//   /probe end                    collect every outstanding observation in order (box for each), then close the session.
+//   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
+//   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
 // IDs: R0 R1 R1b R1c R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
@@ -39,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.7.0")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.8.0")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.7.0";
+    private const string Version = "0.8.0";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -59,6 +61,10 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const string ObsBoxName = "TNProbeObs";
     private const string ObsCmdText = "theatricalnuke.probe.obs.text";
     private const string ObsCmdSubmit = "theatricalnuke.probe.obs.submit";
+    private const string ObsCmdClose = "theatricalnuke.probe.obs.close";
+    private const string ObsCloseName = "TNProbeObsClose";
+    private const string ObsInputName = "TNProbeObsInput";
+    private const string ObsSubmitName = "TNProbeObsSubmit";
     private const int MaxObservationWords = 1000;
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
@@ -75,8 +81,13 @@ public class TheatricalNukeProbe : CarbonPlugin
 
     // Session and observation state.
     private SessionLog _session;
-    private ProbeRun _awaiting;
-    private readonly Dictionary<ulong, string> _obsText = new Dictionary<ulong, string>();
+    // FIFO of probes that ended without an observation. The box always works on the head.
+    private readonly List<ProbeRun> _pendingObs = new List<ProbeRun>();
+    private bool _boxOpen;
+    private ulong _boxOwner;
+    private string _boxText = string.Empty;
+    private bool _submitPending;
+    private bool _closeSessionAfterCollect;
     private readonly List<string> _sessionSummary = new List<string>();
 
     // ── lifecycle ────────────────────────────────────────────────────────────────────────────────
@@ -91,7 +102,13 @@ public class TheatricalNukeProbe : CarbonPlugin
         try
         {
             if (_active != null) EndProbe(_active, "aborted: plugin unloading", null, null, false);
-            if (_awaiting != null) SubmitObservation(null, "(plugin unloaded before the observation box was submitted)", true);
+            if (_boxOpen)
+            {
+                foreach (var player in BasePlayer.activePlayerList.ToList())
+                {
+                    if (player.userID == _boxOwner) CuiHelper.DestroyUi(player, ObsBoxName);
+                }
+            }
             if (_session != null) CloseSession("plugin unloading", null);
         }
         catch (Exception ex)
@@ -141,8 +158,11 @@ public class TheatricalNukeProbe : CarbonPlugin
             {
                 var session = _session == null ? "no session open (start with /probe start)" : $"session open: {_session.Path}";
                 var running = _active == null ? "no probe running" : $"{_active.Id} running";
-                var awaiting = _awaiting == null ? string.Empty : $"; observation box open for {_awaiting.Id}";
-                player.ChatMessage($"{session}; {running}{awaiting}.");
+                var pending = _pendingObs.Count == 0
+                    ? "no observations outstanding"
+                    : $"{_pendingObs.Count} observation(s) outstanding, next is {_pendingObs[0].Id}";
+                var box = _boxOpen ? "; observation box open" : string.Empty;
+                player.ChatMessage($"{session}; {running}; {pending}{box}.");
                 return;
             }
 
@@ -160,7 +180,21 @@ public class TheatricalNukeProbe : CarbonPlugin
                     return;
                 }
 
-                EndSession(player, "operator /probe end");
+                EndSession(player);
+                return;
+            }
+
+            if (first.Equals("obs", StringComparison.OrdinalIgnoreCase))
+            {
+                // Chat fallback for the observation box: /probe obs <text>. Collects the next outstanding observation.
+                var text = string.Join(" ", args.Skip(1));
+                if (IsBlank(text))
+                {
+                    player.ChatMessage("Usage: /probe obs <your observation>. Collects the next outstanding observation.");
+                    return;
+                }
+
+                CollectHead(player, text, "chat command");
                 return;
             }
 
@@ -192,7 +226,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
                 if (chatObservation.Length == 0)
                 {
-                    // No words after end: open the observation box and wait for the operator to submit it.
+                    // No words after end: queue the observation and open the box to collect it.
                     EndProbe(_active, "ended by operator", null, player, true);
                 }
                 else
@@ -203,15 +237,15 @@ public class TheatricalNukeProbe : CarbonPlugin
                 return;
             }
 
-            if (_awaiting != null)
-            {
-                player.ChatMessage($"The observation box for {_awaiting.Id} is still open. Submit it first.");
-                return;
-            }
-
             if (_session == null)
             {
                 player.ChatMessage("No session is open. Start one with /probe start first.");
+                return;
+            }
+
+            if (_pendingObs.Count > 0)
+            {
+                player.ChatMessage($"{_pendingObs.Count} observation(s) outstanding, next {_pendingObs[0].Id}. Use /probe end to collect them before starting a probe.");
                 return;
             }
 
@@ -232,8 +266,9 @@ public class TheatricalNukeProbe : CarbonPlugin
 
     private void Help(BasePlayer player)
     {
-        player.ChatMessage("Session: /probe start (open the session log)   /probe end (close it)   /probe status");
-        player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (opens an observation box)");
+        player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
+        player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
+        player.ChatMessage("Observation without the box: /probe obs <your text>");
         player.ChatMessage("Probes: R0 R1 R1b R1c R1f R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
@@ -268,7 +303,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             OperatorId = player.userID,
         };
         _sessionSummary.Clear();
-        _obsText.Clear();
+        ResetBox();
 
         SessionLine("BANNER", "########## PROBE SESSION START ##########");
         SessionLine("INFO", $"plugin=TheatricalNukeProbe v{Version}");
@@ -276,22 +311,18 @@ public class TheatricalNukeProbe : CarbonPlugin
         SessionLine("INFO", $"operator={player.userID} '{player.displayName}' pos={Pos(player.transform.position)} yaw={player.transform.eulerAngles.y:0.0}");
         SessionLine("INFO", $"server hostname='{ConVar.Server.hostname}' level='{ConVar.Server.level}' worldsize={ConVar.Server.worldsize} m");
         SessionLine("INFO", $"players online={BasePlayer.activePlayerList.Count}");
-        SessionLine("PROTOCOL", "one probe at a time; every probe writes into this file; /probe <ID> end opens an observation box; /probe end closes the session.");
+        SessionLine("PROTOCOL", "one probe at a time; every probe writes into this file; /probe <ID> end queues the observation; /probe end collects outstanding observations, then closes the session.");
 
         player.ChatMessage($"Probe session started. Log: {_session.Path}");
     }
 
-    private void EndSession(BasePlayer player, string reason)
+    // /probe end: with nothing outstanding, closes the session. Otherwise collects outstanding observations
+    // one at a time (box for each, or /probe obs <text>) and closes the session when the last one is saved.
+    private void EndSession(BasePlayer player)
     {
         if (_session == null)
         {
             player?.ChatMessage("No session is open.");
-            return;
-        }
-
-        if (_awaiting != null)
-        {
-            player?.ChatMessage($"The observation box for {_awaiting.Id} is still open. Submit it first.");
             return;
         }
 
@@ -301,13 +332,38 @@ public class TheatricalNukeProbe : CarbonPlugin
             return;
         }
 
-        CloseSession(reason, player);
+        if (_pendingObs.Count == 0)
+        {
+            CloseSession("operator /probe end", player);
+            return;
+        }
+
+        _closeSessionAfterCollect = true;
+        SessionLine("COLLECT", $"/probe end with {_pendingObs.Count} observation(s) outstanding; collecting in sequence, starting with {_pendingObs[0].Id}");
+
+        if (_boxOpen)
+        {
+            player?.ChatMessage($"{_pendingObs.Count} observation(s) outstanding. The box is open for {_pendingObs[0].Id}. Submit it, or close it with X and use /probe end again.");
+            return;
+        }
+
+        player?.ChatMessage($"{_pendingObs.Count} observation(s) outstanding. Collecting now, starting with {_pendingObs[0].Id}.");
+        OpenNextObservationBox(player);
     }
 
     private void CloseSession(string reason, BasePlayer player)
     {
         var closing = _session;
         if (closing == null) return;
+
+        // Anything still outstanding is recorded as missing. Normally empty: /probe end only closes when nothing is outstanding.
+        foreach (var run in _pendingObs.ToList())
+        {
+            Line(run, "MISSING", "no observation collected before the session closed");
+            CompleteProbeLog(run);
+        }
+
+        _pendingObs.Clear();
 
         var duration = (DateTime.UtcNow - closing.StartUtc).TotalSeconds;
         SessionLine("INFO", $"reason={reason}; utc={DateTime.UtcNow:o}; duration={duration:0.0}s; probes run={closing.ProbesRun}");
@@ -319,7 +375,8 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         _session = null;
         _sessionSummary.Clear();
-        _obsText.Clear();
+        ResetBox();
+        _closeSessionAfterCollect = false;
         player?.ChatMessage($"Session closed. Log: {closing.Path}");
     }
 
@@ -412,6 +469,8 @@ public class TheatricalNukeProbe : CarbonPlugin
         op.ChatMessage($"{id} running. Session log: {run.LogPath}. End with: /probe {id} end");
     }
 
+    // Ends a probe: runs cleanup. With an observation it completes now. Without one it is queued,
+    // and /probe end (or the box opened here when openBox is true) collects it.
     private void EndProbe(ProbeRun run, string outcome, string observation, BasePlayer op, bool openBox)
     {
         if (run == null || run.Ended) return;
@@ -421,7 +480,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         try
         {
-            if (!string.IsNullOrEmpty(observation))
+            if (!IsBlank(observation))
             {
                 run.Observed = true;
                 Line(run, "OBSERVE", observation);
@@ -430,43 +489,36 @@ public class TheatricalNukeProbe : CarbonPlugin
             SnapshotEnvironment(run, op, "end");
             run.CleanupStatus = RunCleanup(run);
 
-            if (openBox && op != null)
+            if (run.Observed)
             {
-                Line(run, "END-PENDING", $"cleanup={run.CleanupStatus}; waiting for the observation box to be submitted");
-                _awaiting = run;
-                OpenObservationBox(op, run);
-                op.ChatMessage($"Type your observation for {run.Id} in the box, then press Submit.");
+                CompleteProbeLog(run);
+                op?.ChatMessage($"{run.Id} ended. Cleanup: {run.CleanupStatus}. Observation saved.");
                 return;
             }
 
-            FinishProbe(run, op);
+            _pendingObs.Add(run);
+            Banner(run, "END-PENDING", $"outcome={run.Outcome}; cleanup={run.CleanupStatus}; observation=PENDING; queue position {_pendingObs.Count}");
+            Line(run, "PENDING", "no observation yet. Queued for collection by /probe end.");
+            op?.ChatMessage($"{run.Id} ended. Cleanup: {run.CleanupStatus}. {_pendingObs.Count} observation(s) outstanding.");
+
+            if (openBox && op != null) OpenNextObservationBox(op);
         }
         catch (Exception ex)
         {
             ErrorLog(run, "EndProbe", ex);
-            if (!ReferenceEquals(_awaiting, run)) FinishProbeSafely(run);
+            if (!run.Completed && !run.Observed && !_pendingObs.Contains(run)) _pendingObs.Add(run);
         }
     }
 
-    private void FinishProbe(ProbeRun run, BasePlayer op)
+    private void CompleteProbeLog(ProbeRun run)
     {
+        if (run.Completed) return;
+        run.Completed = true;
+
         var duration = (DateTime.UtcNow - run.StartUtc).TotalSeconds;
-        var observed = run.Observed ? "yes" : "no";
+        var observed = run.Observed ? "yes" : "NO";
         Banner(run, "END", $"outcome={run.Outcome}; cleanup={run.CleanupStatus}; duration={duration:0.0}s; observation={observed}; results={run.Results.Count}");
         _sessionSummary.Add($"{run.Id} outcome={run.Outcome} cleanup={run.CleanupStatus} duration={duration:0.0}s observation={observed}");
-        op?.ChatMessage($"{run.Id} ended. Cleanup: {run.CleanupStatus}. Session log: {run.LogPath}");
-    }
-
-    private void FinishProbeSafely(ProbeRun run)
-    {
-        try
-        {
-            FinishProbe(run, null);
-        }
-        catch (Exception ex)
-        {
-            ErrorLog(run, "FinishProbe", ex);
-        }
     }
 
     private string RunCleanup(ProbeRun run)
@@ -570,41 +622,150 @@ public class TheatricalNukeProbe : CarbonPlugin
         }
     }
 
-    // ── observation box (CUI) ────────────────────────────────────────────────────────────────────
-    private void OpenObservationBox(BasePlayer op, ProbeRun run)
+    // ── observation queue and box (CUI) ──────────────────────────────────────────────────────────
+    // Outstanding observations are collected strictly in order. The box shows the head of the queue.
+    // Submit: the box text is saved for the head, then the next one opens. X closes the box and keeps the item queued.
+    private void OpenNextObservationBox(BasePlayer op)
     {
-        _obsText[op.userID] = string.Empty;
+        if (op == null || _pendingObs.Count == 0 || _boxOpen) return;
+
+        var head = _pendingObs[0];
+        _boxOpen = true;
+        _boxOwner = op.userID;
+        _boxText = string.Empty;
+        _submitPending = false;
+
         CuiHelper.DestroyUi(op, ObsBoxName);
-        CuiHelper.AddUi(op, ObservationBoxJson(run.Id));
-        Line(run, "DEBUG", $"observation box opened for operator {op.userID}; limit {MaxObservationWords} words, {MaxObservationChars} characters");
+        CuiHelper.AddUi(op, ObservationBoxJson(head.Id, _pendingObs.Count));
+        SessionLine("BOX", $"observation box opened for {head.Id} (operator {op.userID}); {_pendingObs.Count} outstanding; limit {MaxObservationWords} words / {MaxObservationChars} characters");
     }
 
-    private void CloseObservationBox(BasePlayer op)
+    private void CloseBox(BasePlayer op, string reason)
     {
-        CuiHelper.DestroyUi(op, ObsBoxName);
-        _obsText.Remove(op.userID);
+        var wasOpen = _boxOpen;
+        ResetBox();
+        if (op != null) CuiHelper.DestroyUi(op, ObsBoxName);
+        if (wasOpen) SessionLine("BOX", $"observation box closed: {reason}");
     }
 
-    private static string ObservationBoxJson(string probeId)
+    private void ResetBox()
     {
+        _boxOpen = false;
+        _boxOwner = 0;
+        _boxText = string.Empty;
+        _submitPending = false;
+    }
+
+    // Saves one observation for the head of the queue, then opens the next box or closes the session.
+    private void CollectHead(BasePlayer op, string text, string source)
+    {
+        if (_pendingObs.Count == 0)
+        {
+            op?.ChatMessage("No observation is outstanding.");
+            return;
+        }
+
+        var run = _pendingObs[0];
+
+        if (IsBlank(text))
+        {
+            op?.ChatMessage($"The observation for {run.Id} is empty. Type something, then Submit.");
+            return;
+        }
+
+        var words = CountWords(text);
+        if (words > MaxObservationWords)
+        {
+            SessionLine("BOX", $"observation for {run.Id} rejected: {words} words exceeds {MaxObservationWords}");
+            op?.ChatMessage($"Observation is {words} words; the limit is {MaxObservationWords}. Shorten it and submit again.");
+            return;
+        }
+
+        _pendingObs.RemoveAt(0);
+        if (_boxOpen) CloseBox(op, "submitted");
+
+        run.Observed = true;
+        SessionLine("COLLECT", $"{run.Id} observation via {source}: words={words} characters={text.Length}");
+        Line(run, "OBSERVE", text);
+        CompleteProbeLog(run);
+
+        if (_pendingObs.Count > 0)
+        {
+            op?.ChatMessage($"{run.Id} saved. Next: {_pendingObs[0].Id} ({_pendingObs.Count} outstanding).");
+            OpenNextObservationBox(op);
+        }
+        else
+        {
+            op?.ChatMessage($"{run.Id} saved. All observations collected.");
+            if (_closeSessionAfterCollect) CloseSession("all observations collected", op);
+        }
+    }
+
+    private void TrySubmitBox(BasePlayer player)
+    {
+        if (!_submitPending || !_boxOpen || IsBlank(_boxText)) return;
+
+        _submitPending = false;
+        CollectHead(player, _boxText, "observation box");
+    }
+
+    // The input field sends its text when it loses focus. The Submit click can arrive first, so wait briefly for the text.
+    private void AfterSubmitWait(BasePlayer player, ProbeRun head)
+    {
+        try
+        {
+            if (!_submitPending || !_boxOpen) return;
+            if (_pendingObs.Count == 0 || !ReferenceEquals(_pendingObs[0], head)) return;
+
+            if (IsBlank(_boxText))
+            {
+                _submitPending = false;
+                SessionLine("BOX", "submit rejected: no text arrived from the input field within 0.6 s");
+                player?.ChatMessage("No text has reached the server. Click in the box, type, then press Submit. If typing still fails, use /probe obs <text>.");
+                return;
+            }
+
+            TrySubmitBox(player);
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(null, "observation submit wait", ex);
+        }
+    }
+
+    private static bool IsBlank(string text) => string.IsNullOrWhiteSpace(text);
+
+    private static string ObservationBoxJson(string probeId, int outstanding)
+    {
+        var title = "Observation for " + probeId + " (" + outstanding + " outstanding). Click the box, type, then Submit. X closes without saving.";
         return "[" +
                "{\"name\":\"" + ObsBoxName + "\",\"parent\":\"Overlay\",\"components\":[" +
                "{\"type\":\"UnityEngine.UI.Image\",\"color\":\"0 0 0 0.92\"}," +
                "{\"type\":\"NeedsCursor\"},{\"type\":\"NeedsKeyboard\"}," +
                "{\"type\":\"RectTransform\",\"anchormin\":\"0.22 0.16\",\"anchormax\":\"0.78 0.86\"}]}," +
                "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Observation for " + probeId + ": type below, then press Submit\",\"fontSize\":16,\"align\":\"UpperCenter\",\"color\":\"1 1 1 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.88\",\"anchormax\":\"0.97 0.98\"}]}," +
+               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"" + title + "\",\"fontSize\":15,\"align\":\"UpperLeft\",\"color\":\"1 1 1 1\"}," +
+               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.89\",\"anchormax\":\"0.88 0.98\"}]}," +
+               "{\"name\":\"" + ObsCloseName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
+               "{\"type\":\"UnityEngine.UI.Button\",\"color\":\"0.6 0.1 0.1 1\",\"command\":\"" + ObsCmdClose + "\"}," +
+               "{\"type\":\"RectTransform\",\"anchormin\":\"0.92 0.9\",\"anchormax\":\"0.98 0.98\"}]}," +
+               "{\"parent\":\"" + ObsCloseName + "\",\"components\":[" +
+               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"X\",\"fontSize\":16,\"align\":\"MiddleCenter\",\"color\":\"1 1 1 1\"}," +
+               "{\"type\":\"RectTransform\",\"anchormin\":\"0 0\",\"anchormax\":\"1 1\"}]}," +
                "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.InputField\",\"text\":\"\",\"fontSize\":14,\"align\":\"UpperLeft\",\"command\":\"" + ObsCmdText + "\",\"characterLimit\":" + MaxObservationChars + ",\"lineType\":\"MultiLineNewline\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.22\",\"anchormax\":\"0.97 0.85\"}]}," +
+               "{\"type\":\"UnityEngine.UI.Image\",\"color\":\"0.14 0.14 0.14 1\"}," +
+               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.22\",\"anchormax\":\"0.97 0.86\"}]}," +
+               "{\"name\":\"" + ObsInputName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
+               "{\"type\":\"UnityEngine.UI.InputField\",\"text\":\"\",\"fontSize\":14,\"align\":\"UpperLeft\",\"color\":\"1 1 1 1\",\"command\":\"" + ObsCmdText + "\",\"characterLimit\":" + MaxObservationChars + ",\"lineType\":\"MultiLineNewline\"}," +
+               "{\"type\":\"NeedsKeyboard\"}," +
+               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.22\",\"anchormax\":\"0.97 0.86\"}]}," +
                "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Limit " + MaxObservationWords + " words (about " + MaxObservationChars + " characters). Click the box, type, then press Submit.\",\"fontSize\":13,\"align\":\"MiddleLeft\",\"color\":\"0.8 0.8 0.8 1\"}," +
+               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Limit " + MaxObservationWords + " words (about " + MaxObservationChars + " characters).\",\"fontSize\":13,\"align\":\"MiddleLeft\",\"color\":\"0.8 0.8 0.8 1\"}," +
                "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.13\",\"anchormax\":\"0.97 0.20\"}]}," +
-               "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
+               "{\"name\":\"" + ObsSubmitName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
                "{\"type\":\"UnityEngine.UI.Button\",\"color\":\"0.15 0.55 0.2 1\",\"command\":\"" + ObsCmdSubmit + "\"}," +
                "{\"type\":\"RectTransform\",\"anchormin\":\"0.35 0.03\",\"anchormax\":\"0.65 0.12\"}]}," +
-               "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
+               "{\"parent\":\"" + ObsSubmitName + "\",\"components\":[" +
                "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Submit observation\",\"fontSize\":16,\"align\":\"MiddleCenter\",\"color\":\"1 1 1 1\"}," +
                "{\"type\":\"RectTransform\",\"anchormin\":\"0 0\",\"anchormax\":\"1 1\"}]}" +
                "]";
@@ -616,15 +777,16 @@ public class TheatricalNukeProbe : CarbonPlugin
         try
         {
             var player = arg.Player();
-            if (player == null || _awaiting == null || player.userID != _awaiting.OperatorId) return;
+            if (player == null || !_boxOpen || player.userID != _boxOwner) return;
 
-            var text = JoinArgs(arg);
-            _obsText[player.userID] = text;
-            Line(_awaiting, "DEBUG", $"input field sent text: words={CountWords(text)} characters={text.Length}");
+            _boxText = JoinArgs(arg);
+            SessionLine("BOX", $"input field sent text: words={CountWords(_boxText)} characters={_boxText.Length}");
+
+            if (_submitPending) TrySubmitBox(player);
         }
         catch (Exception ex)
         {
-            ErrorLog(_awaiting, "observation text command", ex);
+            ErrorLog(null, "observation text command", ex);
         }
     }
 
@@ -636,58 +798,46 @@ public class TheatricalNukeProbe : CarbonPlugin
             var player = arg.Player();
             if (player == null) return;
 
-            if (_awaiting == null)
+            if (!_boxOpen || player.userID != _boxOwner)
             {
-                player.ChatMessage("No observation box is open.");
+                player.ChatMessage("No observation box is open for you. Use /probe end.");
                 return;
             }
 
-            var text = _obsText.TryGetValue(player.userID, out var stored) ? stored : string.Empty;
-            Line(_awaiting, "DEBUG", $"submit pressed: stored text words={CountWords(text)} characters={text.Length}");
-            SubmitObservation(player, text, false);
+            _submitPending = true;
+            SessionLine("BOX", $"submit pressed: stored words={CountWords(_boxText)} characters={_boxText.Length}");
+
+            if (IsBlank(_boxText))
+            {
+                var head = _pendingObs.Count > 0 ? _pendingObs[0] : null;
+                timer.Once(0.6f, () => AfterSubmitWait(player, head));
+                return;
+            }
+
+            TrySubmitBox(player);
         }
         catch (Exception ex)
         {
-            ErrorLog(_awaiting, "observation submit command", ex);
+            ErrorLog(null, "observation submit command", ex);
         }
     }
 
-    private void SubmitObservation(BasePlayer op, string text, bool forced)
+    [ConsoleCommand(ObsCmdClose)]
+    private void ObservationCloseCommand(ConsoleSystem.Arg arg)
     {
-        var run = _awaiting;
-        if (run == null) return;
-
-        if (!forced)
+        try
         {
-            if (op == null || op.userID != run.OperatorId)
-            {
-                op?.ChatMessage("Only the operator who ended the probe can submit this box.");
-                return;
-            }
+            var player = arg.Player();
+            if (player == null || !_boxOpen || player.userID != _boxOwner) return;
 
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                op.ChatMessage("No text has arrived yet. Click in the box, type your observation, then press Submit.");
-                Line(run, "DEBUG", "submit rejected: no text received from the input field");
-                return;
-            }
+            var head = _pendingObs.Count > 0 ? _pendingObs[0].Id : "the next probe";
+            CloseBox(player, "closed without submitting");
+            player.ChatMessage($"Closed without saving. {head} still needs an observation: /probe end collects it again, or use /probe obs <text>.");
         }
-
-        var words = CountWords(text);
-        if (words > MaxObservationWords)
+        catch (Exception ex)
         {
-            Line(run, "DEBUG", $"submit rejected: {words} words exceeds the limit of {MaxObservationWords}");
-            op?.ChatMessage($"Observation is {words} words; the limit is {MaxObservationWords}. Shorten it and press Submit.");
-            return;
+            ErrorLog(null, "observation close command", ex);
         }
-
-        _awaiting = null;
-        if (op != null) CloseObservationBox(op);
-
-        Line(run, "DEBUG", $"observation accepted: words={words} characters={text.Length}{(forced ? " (forced: plugin unloading)" : string.Empty)}");
-        run.Observed = !string.IsNullOrWhiteSpace(text);
-        Line(run, "OBSERVE", string.IsNullOrWhiteSpace(text) ? "(none entered)" : text);
-        FinishProbe(run, op);
     }
 
     private static string JoinArgs(ConsoleSystem.Arg arg)
@@ -703,7 +853,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
     private static int CountWords(string text)
     {
-        return string.IsNullOrWhiteSpace(text) ? 0 : text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries).Length;
+        return IsBlank(text) ? 0 : text.Split((char[])null, StringSplitOptions.RemoveEmptyEntries).Length;
     }
 
     // ── logging: one session file receives every probe ───────────────────────────────────────────
@@ -1615,6 +1765,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         public string Outcome = string.Empty;
         public string CleanupStatus = "not run";
         public bool Observed;
+        public bool Completed;
         public int TickCount;
         public readonly List<Tuple<string, BaseEntity>> Tracked = new List<Tuple<string, BaseEntity>>();
     }
