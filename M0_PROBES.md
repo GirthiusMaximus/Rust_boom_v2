@@ -698,3 +698,7 @@ Position used for runs 8 to 11: operator about (-2065 to -2068, 15.5 to 16.2, 45
 | R1t | `GameManager.server.CreateEntity` on the silo prefab path | Returned null. The silo prefab is not a networked entity prefab. Route closed. | OK |
 
 **Open:** R1g `go` and R1h `go` (plain effect, no handle) are not killable and remain blocked by the killability rule. The text truncation in R1o needs a fix before its observation can be trusted.
+
+**Run 12 operator observations (follow-up):** R1o: "I saw the bus but no missle." R1t: "nothing spawned" (consistent with the null return from CreateEntity).
+
+**Observation box truncation (open bug):** R1o's observation was cut at 69 characters. Cause not yet confirmed. v0.11.8 adds `/probe more <text>` to append the rest of an observation (logged as OBSERVE-MORE), and `/probe boxtest` to find where the box cuts a numbered test string.
