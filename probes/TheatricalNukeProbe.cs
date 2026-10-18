@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.6.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.7.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -17,7 +17,7 @@
 //   /probe obs <words>            chat fallback: give the next outstanding observation without the box.
 //   Box: type in the field, press Submit (saves and opens the next). X closes without saving; the item stays queued.
 //   /probe abort | status | help
-// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R1r R1s R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
+// IDs: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R1r R1s R1t R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10
 // Quote any asset path that contains a space:  /probe R6b "assets/... air raid/airraidsound.prefab" 0 1 0
 //
 // Every probe auto-ends after its timeout and runs its cleanup list in reverse.
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.6")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.7")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.6";
+    private const string Version = "0.11.7";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -69,7 +69,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t" };
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -303,11 +303,11 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
         player.ChatMessage("/probe outstanding: reopens every outstanding observation box in sequence (also /probe oustanding).");
-        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R1r R1s R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
+        player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R1r R1s R1t R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
-        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)   R1r prefab id before Spawn, no Harmony   R1s wider Harmony write-path interception");
+        player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)   R1r prefab id before Spawn, no Harmony   R1s wider Harmony write-path interception   R1t silo prefab via CreateEntity");
         player.ChatMessage("Also: /probe abort");
     }
 
@@ -474,6 +474,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1q": ProbeR1q(run, op); break;
                 case "R1r": ProbeR1r(run, op); break;
                 case "R1s": ProbeR1s(run, op); break;
+                case "R1t": ProbeR1t(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -1901,6 +1902,26 @@ public class TheatricalNukeProbe : CarbonPlugin
             return "called";
         }
         catch (Exception ex) { return "error " + ex.GetType().Name; }
+    }
+
+    // ── R1t: the silo missile prefab created directly as a networked entity (no copy, no ID swap) ──
+    // CreateEntity is the normal server path for a networked prefab. If it returns null, the silo prefab is
+    // not a networked entity prefab and the route is closed. If it returns an entity, it is spawned for observation
+    // and killed in cleanup.
+    private void ProbeR1t(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 30f;
+        var e = GameManager.server.CreateEntity(MissilePrefab, InFront(p, 8f, 2f), Quaternion.identity);
+        if (e == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null for the silo missile prefab. The prefab is not a networked entity prefab. Route closed.");
+            return;
+        }
+
+        Line(run, "STEP", $"CreateEntity returned {e.GetType().Name} prefabID={(R1PrefabIdField()?.GetValue(e))}");
+        e.Spawn();
+        Track(run, e, "r1t silo prefab entity");
+        Line(run, "RESULT", "Operator: look 8 m in front at about 2 m. Report what appears, its height and shape, and whether it looks like the upright silo missile.");
     }
 
     // R1k: every networked entity prefab (manifest.entities), scanned for a child whose name looks like a missile.
