@@ -33,6 +33,7 @@ using System.Reflection;
 using System.Text;
 using Carbon.Plugins;
 using HarmonyLib;
+using Oxide.Game.Rust.Cui;
 using Oxide.Plugins;
 using UnityEngine;
 
@@ -868,7 +869,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     // ── R2: CCTV identifiers and parenting ───────────────────────────────────────────────────────
     // Run 3 showed the default identifier COBALT1 is shared by many monument cameras (32 on this server).
     // PoweredRemoteControlEntity.Spawn() replaces a "#ID" token with the entity's net id, so a template
-    // "NUKECAM#ID" gives a unique identifier. Set before Spawn(). IsValidIdentifier: alphanumeric, <= 32 chars.
+    // "NUKE#ID" gives a unique identifier. Set before Spawn(). IsValidIdentifier: alphanumeric, <= 32 chars.
     private void ProbeR2(ProbeRun run, BasePlayer p)
     {
         run.TimeoutSeconds = 600f;
@@ -889,8 +890,8 @@ public class TheatricalNukeProbe : CarbonPlugin
             return;
         }
 
-        Line(run, "STEP", $"prefab identifier before spawn='{cctv.rcIdentifier}'; setting template 'NUKECAM#ID'");
-        cctv.rcIdentifier = "NUKECAM#ID";
+        Line(run, "STEP", $"prefab identifier before spawn='{cctv.rcIdentifier}'; setting template 'NUKE#ID'");
+        cctv.rcIdentifier = "NUKE#ID";
         cctv.Spawn();
         Track(run, cctv, "cctv");
 

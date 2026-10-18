@@ -493,8 +493,24 @@ Logs are in `/home/user/probe_logs_run5/` (copy to `probes/logs/run-5/` on commi
 
 ### Open after run 5
 
-- **Q-A (map size unit).** "6000 square meters" was recorded as a 6000 m side length. Confirm: 6000 m × 6000 m, or a different unit?
-- **Q-B (bookmark name).** Current name is `NUKECAM` + network ID (14 characters). Shorter option: `NUKE` + ID. Which do you want?
+- **Q-A (map size).** Answered: 6000 m × 6000 m.
+- **Q-B (bookmark name).** Answered: `NUKE` + network ID (probe v0.6.1).
 - **Q-C (siren falloff).** Did the siren stop being audible as you walked out, and at what distance? Please re-run R6b with a note of the distance.
 - **Q-D (missile body).** Choose option A, B or C (see the carrier section above), or ask for a further test.
 - **Q-E (R7 sizes).** Which radii should the sweep use next? Options: `/probe R7 0.1 0.25 0.5 1`. The probe now takes any radius list.
+
+
+### Build fix — v0.6.0 compile error (CS0103)
+
+`CuiHelper` lives in `Oxide.Game.Rust.Cui` (Carbon `src/Carbon.Components/Carbon.Common/src/Oxide/CUI/CuiHelper.cs`). Added `using Oxide.Game.Rust.Cui;`. Version **0.6.1**. The server was still on v0.5.0 after the failed compile, so the operator needs `c.reload TheatricalNukeProbe` again.
+
+### Missile body — proposed probe sequence (for approval)
+
+Hypothesis from run 5: the silo missile root is **inactive** in its prefab (`active=False`, Transform + MeshCollider only), so it may be a child that a parent entity activates. The parent entity's prefab would then already carry the visual to clients.
+
+1. **R1c — manifest search (read-only, no spawns).** Search `GameManifest.pathToGuid` (all bundled asset paths) for `nuclear`, `silo`, `missile`, `warhead`. For each hit, mark whether it is in `GameManifest.Current.entities` (networked). For networked hits, log the child hierarchy names. Output: a list of candidate entities that could carry the missile.
+2. **R1d — candidate entity visuals.** Spawn the most likely networked parent (from R1c), at the same spot as R1b. Operator reports whether the missile body is visible on it. Cleanup kills it.
+3. **R1e — child toggle replication.** Only if R1d shows the body: check whether toggling the missile child on the server changes what the operator sees. This tests whether a theatrical "launch" is possible at all.
+4. Fallback to options A/B/C from Part E if R1c–R1e find nothing.
+
+Run R1c first. It has no world effect and is the cheapest way to answer the question.
