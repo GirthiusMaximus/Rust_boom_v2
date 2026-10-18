@@ -2,7 +2,7 @@
 
 > **Product:** Theatrical Nuke
 > **Artifact:** Carbon plugin (`.cs`, server-side only)
-> **Status:** **Draft v0.5 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
+> **Status:** **Draft v0.6 — decisions in, probes pending.** Q1–Q12 answered; Q13–Q18 open (§13).
 > Storyboard is intentionally incomplete past the terminal phase.
 > **Last updated:** 2026-10-17
 >
@@ -216,7 +216,7 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 
 | ID | Pri | Requirement |
 |---|---|---|
-| FR-25 | M | The booster uses `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab` (`[UNKNOWN]` entity class — probe R1). |
+| FR-25 | M | **Locked (operator, run 7):** the initial missile on ascent and boost **must** be `assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab`. No substitute body (warhead bus, rocket, or other entity) is acceptable for this shot. The route to a client is still open: R1 avenues in `M0_PROBES.md` Part E. Every route must be killable after the test (decision Q-F). |
 | FR-26 | M | Four fire/smoke effects are attached at the booster nozzles for the duration of the boost. `Q4` (assets) |
 | FR-27 | M | Apogee is configurable (default `Y = 1000`) and the boost arc targets the call position. |
 | FR-28 | M | The booster is visible and audible to all players (broadcast effects at key beats). |
@@ -622,6 +622,7 @@ Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_P
 | Q10 | Target rules | **Anywhere is targetable; cannot throw from inside a safe zone** (A/D hybrid) | FR-17 added; safe-zone behaviour still needs R10/Q17. |
 | Q11 | 80 %/95 % | **Altitude fraction** (A) | Trajectory triggers by Y. |
 | Q12 | Booster at hand-off | **Killed instantly** (A) | Separation flash masks it. |
+| Q-F | Silo missile route and cleanup (run 7) | **Must use `nuclear_silo_missile.prefab`.** Effect-route spawns with no handle are acceptable only if killable afterwards. | FR-25 locked. Routes: Carbon `ClientEntity` (R1n, killable), effect parented to an entity (R1o, killable), plus R1g/R1h (not killable, gated). |
 
 ### 13.2 Remaining
 
@@ -694,6 +695,7 @@ amended if reality disagreed.
 | 0.3 | 2026-10-18 | Probe run 5 (v0.5.0 logs): R1b carrier test: a bare networked carrier spawns, and a server-side missile copy under it is not reported as visible (operator saw nothing; M0 Part E); R2 NUKECAM identifier works and the feed shows our camera; R5 confirmed: smoke 15 s, no cargo plane; R9 static plumes correct, follow mode merged onto the operator (fixed in v0.6.0, untested); R7 0.5 m is about one grid cell. Map size recorded as 6000 (unit to confirm; now confirmed 6000 m, see 0.4). Probe protocol v0.6: one session log, observation box on `/probe <ID> end`. | Build agent |
 | 0.4 | 2026-10-18 | Operator answers: map is 6000 m × 6000 m (Q-A). CCTV bookmark identifier is `NUKE` + network ID (Q-B), set in probe v0.6.1. Probe v0.6.1 fixes a compile error (missing `Oxide.Game.Rust.Cui` using for `CuiHelper`). Missile body remains open (R1b: server-side copy invisible). | Build agent |
 | 0.5 | 2026-10-18 | Operator answers: siren audible again at about 2000 m from spawn (Q-C). R7 sweep set to 0.01–0.25 (Q-E). Probe v0.7.0 adds R1c manifest search, R1f silo parent test, R7 move (moving marker). Missile body route still open; R1c/R1f decide between a networked parent that already carries the missile, and options A/B/C. | Build agent |
+| 0.6 | 2026-10-18 | Operator run 7: the initial missile on ascent and boost must use `nuclear_silo_missile.prefab` (FR-25 locked; decision Q-F). Any spawned route must be killable after the test. Probe v0.11.0 adds R1g–R1o: effect routes, scene search, prefab audit, networked child scan, component injection, Carbon `ClientEntity` (killable, moves) and an effect parented to an entity (killable). Body route still open pending run-7 results. | Build agent |
 
 ---
 
