@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.8.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.9.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.8")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.9")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.8";
+    private const string Version = "0.11.9";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -749,6 +749,8 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         run.Observed = true;
         SessionLine("COLLECT", $"{run.Id} observation via {source}: words={words} characters={text.Length}");
+        // Echo what was captured, so the operator can see a cut and send the rest with /probe more.
+        op?.ChatMessage($"{run.Id} captured {words} words, {text.Length} characters. If the observation is incomplete, send the rest with /probe more <text>.");
         Line(run, "OBSERVE", EscapeText(text));
         CompleteProbeLog(run);
 

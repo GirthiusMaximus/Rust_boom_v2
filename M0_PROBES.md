@@ -704,3 +704,10 @@ Position used for runs 8 to 11: operator about (-2065 to -2068, 15.5 to 16.2, 45
 **Observation box truncation (open bug):** R1o's observation was cut at 69 characters. Cause not yet confirmed. v0.11.8 adds `/probe more <text>` to append the rest of an observation (logged as OBSERVE-MORE), and `/probe boxtest` to find where the box cuts a numbered test string.
 
 **Client console evidence (run 12 testing, reported by operator):** three times, "Tried to spawn an effect without a EffectRecycle component (assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab)". The client rejects the silo prefab as an effect because it has no `EffectRecycle` component. This explains the effect-route results (R1g, R1h, R1o). The effect route is closed for this prefab, and the rejection is on the client's asset, which the server cannot change.
+
+**Client console (run 12 and 13, from operator):**
+- 16:40:11 (during R1s): "CreateEntity called on a prefab that isn't an entity!" and "Couldn't create network entity!" for the silo prefab. The client cannot build the silo prefab as a network entity from the ID swap. This explains R1r and R1s showing no body.
+- 16:46:56 (during R1o): "Tried to spawn an effect without a EffectRecycle component". The client refuses the silo prefab as an effect.
+- 16:41:01 and 16:46:01: "Curl error 6: Could not resolve host: cdp.cloud.unity3d.com". Unity cloud diagnostics. The client has no internet access. Unrelated.
+
+**Box capture test (BOXTEST, 17:04):** the box sent 79 characters (0001 to 0016) and cut off before 0017. `/probe more` delivered 114 characters intact (0017 to 0039). Run 9 earlier delivered a 137-character observation intact, so the box has no fixed length limit. The text is lost in the client field at focus loss, cause not yet known. v0.11.9 echoes the captured length after each observation, so the operator can send the rest with `/probe more`.
