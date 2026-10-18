@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.5.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.6.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -41,11 +41,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.5")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.6")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.5";
+    private const string Version = "0.11.6";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -198,6 +198,39 @@ public class TheatricalNukeProbe : CarbonPlugin
                 return;
             }
 
+            if (first.Equals("outstanding", StringComparison.OrdinalIgnoreCase) || first.Equals("oustanding", StringComparison.OrdinalIgnoreCase))
+            {
+                // Reopens the observation boxes for every outstanding observation, in sequence. The session stays open.
+                if (args.Length > 1)
+                {
+                    player.ChatMessage("Usage: /probe outstanding (no other words).");
+                    return;
+                }
+
+                if (_pendingObs.Count == 0)
+                {
+                    player.ChatMessage("No observation is outstanding.");
+                    return;
+                }
+
+                if (_active != null)
+                {
+                    player.ChatMessage($"{_active.Id} is still running. End it with /probe {_active.Id} end, then run /probe outstanding.");
+                    return;
+                }
+
+                if (_boxOpen)
+                {
+                    player.ChatMessage($"The box is already open for {_pendingObs[0].Id}. Submit it to move to the next one.");
+                    return;
+                }
+
+                SessionLine("COLLECT", $"/probe outstanding: {_pendingObs.Count} observation(s), starting with {_pendingObs[0].Id}");
+                player.ChatMessage($"{_pendingObs.Count} observation(s) outstanding. Opening {_pendingObs[0].Id} first; each submit opens the next.");
+                OpenNextObservationBox(player);
+                return;
+            }
+
             if (first.Equals("abort", StringComparison.OrdinalIgnoreCase))
             {
                 if (_active == null) player.ChatMessage("No probe running.");
@@ -269,6 +302,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("Session: /probe start (open the log)   /probe end (collect outstanding observations, then close)   /probe status");
         player.ChatMessage("Probe: /probe <ID> [args]   End: /probe <ID> end (queues the observation and opens the box)");
         player.ChatMessage("Observation without the box: /probe obs <your text>");
+        player.ChatMessage("/probe outstanding: reopens every outstanding observation box in sequence (also /probe oustanding).");
         player.ChatMessage("Probes: R0 R1 R1b R1c R1e R1f R1g R1h R1i R1j R1k R1m R1n R1o R1p R1q R1r R1s R2 R3 R4 R5 R6 R6b R6c R7 R8 R9 R10");
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
