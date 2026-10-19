@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.12.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.13.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -42,11 +42,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.12")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.13")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.12";
+    private const string Version = "0.11.13";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -1992,10 +1992,12 @@ public class TheatricalNukeProbe : CarbonPlugin
     // where any cut happens, and the length of the text that reached the probe.
     private void ProbeBoxTest(ProbeRun run, BasePlayer p)
     {
-        run.TimeoutSeconds = 60f;
         var test = string.Join(" ", Enumerable.Range(1, 40).Select(i => i.ToString("D4")));
         Line(run, "STEP", $"test string: 0001 to 0040, {test.Length} characters");
         Line(run, "RESULT", "Operator: type 0001 0002 ... 0040 into the observation box (or paste it), then Submit. The log will show where any cut happens. Expected length: " + test.Length + " characters.");
+
+        // Ends the run at once and opens the box, so no /probe end is needed. Cleanup has nothing to undo (no game action).
+        EndProbe(run, "box test: observation box opened for typed text", null, p, true);
     }
 
     // ── R1u: final attempt. Inspect the in-situ silo missile, list every spawn-like method, try each one. ──
