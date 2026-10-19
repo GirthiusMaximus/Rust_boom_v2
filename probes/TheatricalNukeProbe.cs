@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.11.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.12.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -33,6 +33,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Carbon.Components;
 using Carbon.Plugins;
 using HarmonyLib;
 using Oxide.Game.Rust.Cui;
@@ -41,11 +42,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.11")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.12")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.11";
+    private const string Version = "0.11.12";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -703,7 +704,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         _partCount = 0;
 
         CuiHelper.DestroyUi(op, ObsBoxName);
-        CuiHelper.AddUi(op, ObservationBoxJson(head.Id, _pendingObs.Count));
+        SendObservationBox(op, head.Id, _pendingObs.Count, string.Empty);
         SessionLine("BOX", $"observation box opened for {head.Id} (operator {op.userID}); {_pendingObs.Count} outstanding; limit {MaxObservationWords} words / {MaxObservationChars} characters");
     }
 
@@ -805,58 +806,36 @@ public class TheatricalNukeProbe : CarbonPlugin
 
     private static bool IsBlank(string text) => string.IsNullOrWhiteSpace(text);
 
-    private static string ObservationBoxJson(string probeId, int outstanding, string prefill = "")
+    // Builds the observation box with Carbon's LUI (CarbonMod.MD 10.3). The input sends its value as a command on
+    // submit (Rust.MD: command + " " + value). prefill is the text kept by earlier parts, so the operator continues from it.
+    private void SendObservationBox(BasePlayer player, string probeId, int outstanding, string prefill)
     {
+        using var cui = new CUI(CuiHandler);
+
         var title = "Observation for " + probeId + " (" + outstanding + " outstanding). Type. Add part keeps the text and reopens it; Submit saves all of it. X closes without saving.";
-        var json = "[" + ObsAddButtonJson() + "," +
-               "{\"name\":\"" + ObsBoxName + "\",\"parent\":\"Overlay\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Image\",\"color\":\"0 0 0 0.92\"}," +
-               "{\"type\":\"NeedsCursor\"},{\"type\":\"NeedsKeyboard\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.22 0.16\",\"anchormax\":\"0.78 0.86\"}]}," +
-               "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"" + title + "\",\"fontSize\":15,\"align\":\"UpperLeft\",\"color\":\"1 1 1 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.89\",\"anchormax\":\"0.88 0.98\"}]}," +
-               "{\"name\":\"" + ObsCloseName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Button\",\"color\":\"0.6 0.1 0.1 1\",\"command\":\"" + ObsCmdClose + "\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.92 0.9\",\"anchormax\":\"0.98 0.98\"}]}," +
-               "{\"parent\":\"" + ObsCloseName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"X\",\"fontSize\":16,\"align\":\"MiddleCenter\",\"color\":\"1 1 1 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0 0\",\"anchormax\":\"1 1\"}]}," +
-               "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Image\",\"color\":\"0.14 0.14 0.14 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.22\",\"anchormax\":\"0.97 0.86\"}]}," +
-               "{\"name\":\"" + ObsInputName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.InputField\",\"text\":\"\",\"fontSize\":14,\"align\":\"UpperLeft\",\"color\":\"1 1 1 1\",\"command\":\"" + ObsCmdText + "\",\"characterLimit\":" + MaxObservationChars + ",\"lineType\":\"MultiLineNewline\"}," +
-               "{\"type\":\"NeedsKeyboard\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.22\",\"anchormax\":\"0.97 0.86\"}]}," +
-               "{\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Limit " + MaxObservationWords + " words (about " + MaxObservationChars + " characters).\",\"fontSize\":13,\"align\":\"MiddleLeft\",\"color\":\"0.8 0.8 0.8 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.13\",\"anchormax\":\"0.97 0.20\"}]}," +
-               "{\"name\":\"" + ObsSubmitName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Button\",\"color\":\"0.15 0.55 0.2 1\",\"command\":\"" + ObsCmdSubmit + "\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.35 0.03\",\"anchormax\":\"0.65 0.12\"}]}," +
-               "{\"parent\":\"" + ObsSubmitName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Submit observation\",\"fontSize\":16,\"align\":\"MiddleCenter\",\"color\":\"1 1 1 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0 0\",\"anchormax\":\"1 1\"}]}" +
-               "]";
-        // Prefill: the text kept by earlier parts, so the operator continues from it.
-        return json.Replace("\"type\":\"UnityEngine.UI.InputField\",\"text\":\"\"", "\"type\":\"UnityEngine.UI.InputField\",\"text\":\"" + JsonEscape(prefill) + "\"");
-    }
+        var root = cui.v2.CreateParent(CUI.ClientPanels.Overlay, LuiPosition.Full, ObsBoxName);
+        var overlay = cui.v2.CreatePanel(root, LuiPosition.Full, LuiOffset.None, "0 0 0 0.92");
+        overlay.AddCursor();
+        overlay.AddKeyboard();
 
+        var box = cui.v2.CreatePanel(overlay, new LuiPosition(0.22f, 0.16f, 0.78f, 0.86f), LuiOffset.None, "0.05 0.05 0.05 0.98");
+        cui.v2.CreateText(box, new LuiPosition(0.03f, 0.89f, 0.88f, 0.98f), LuiOffset.None, 15, "1 1 1 1", title, TextAnchor.UpperLeft);
 
-    private static string ObsAddButtonJson()
-    {
-        return "{\"name\":\"" + ObsAddName + "\",\"parent\":\"" + ObsBoxName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Button\",\"color\":\"0.2 0.35 0.65 1\",\"command\":\"" + ObsCmdAdd + "\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0.03 0.03\",\"anchormax\":\"0.32 0.12\"}]}," +
-               "{\"parent\":\"" + ObsAddName + "\",\"components\":[" +
-               "{\"type\":\"UnityEngine.UI.Text\",\"text\":\"Add part (keep typing)\",\"fontSize\":14,\"align\":\"MiddleCenter\",\"color\":\"1 1 1 1\"}," +
-               "{\"type\":\"RectTransform\",\"anchormin\":\"0 0\",\"anchormax\":\"1 1\"}]}";
-    }
+        var close = cui.v2.CreateButton(box, new LuiPosition(0.92f, 0.90f, 0.98f, 0.98f), LuiOffset.None, ObsCmdClose, "0.6 0.1 0.1 1");
+        cui.v2.CreateText(close, LuiPosition.None, LuiOffset.None, 16, "1 1 1 1", "X");
 
-    private static string JsonEscape(string text)
-    {
-        return (text ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+        var input = cui.v2.CreateInput(box, new LuiPosition(0.03f, 0.22f, 0.97f, 0.86f), LuiOffset.None, "1 1 1 1", prefill, 14, ObsCmdText,
+            charLimit: MaxObservationChars, alignment: TextAnchor.UpperLeft);
+        input.SetInputAutoFocus(true);
+        input.SetInputKeyboard(true);
+
+        var add = cui.v2.CreateButton(box, new LuiPosition(0.03f, 0.03f, 0.32f, 0.12f), LuiOffset.None, ObsCmdAdd, "0.2 0.35 0.65 1");
+        cui.v2.CreateText(add, LuiPosition.None, LuiOffset.None, 14, "1 1 1 1", "Add part (keep typing)");
+
+        var submit = cui.v2.CreateButton(box, new LuiPosition(0.35f, 0.03f, 0.65f, 0.12f), LuiOffset.None, ObsCmdSubmit, "0.15 0.55 0.2 1");
+        cui.v2.CreateText(submit, LuiPosition.None, LuiOffset.None, 16, "1 1 1 1", "Submit observation");
+
+        cui.v2.SendUi(player);
     }
 
     [ConsoleCommand(ObsCmdAdd)]
@@ -895,7 +874,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             SessionLine("BOX", $"PART {_partCount} kept for {head.Id}: characters={kept.Length} lines={CountLines(kept)} text=\"{EscapeText(kept)}\"");
 
             CuiHelper.DestroyUi(player, ObsBoxName);
-            CuiHelper.AddUi(player, ObservationBoxJson(head.Id, _pendingObs.Count, kept));
+            SendObservationBox(player, head.Id, _pendingObs.Count, kept);
             _boxText = kept;
             player.ChatMessage($"Part {_partCount} kept ({kept.Length} characters). Keep typing, then Add part again or Submit.");
         }
