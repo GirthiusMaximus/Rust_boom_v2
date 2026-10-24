@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.13.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.14.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -33,8 +33,12 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using Carbon.Components;
 using Carbon.Plugins;
+
+// Only the LUI types are aliased. Importing Carbon.Components whole brings in its Harmony type, which clashes with HarmonyLib.Harmony (CS0104).
+using CUI = Carbon.Components.CUI;
+using LuiPosition = Carbon.Components.LuiPosition;
+using LuiOffset = Carbon.Components.LuiOffset;
 using HarmonyLib;
 using Oxide.Game.Rust.Cui;
 using Oxide.Plugins;
@@ -42,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.13")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.14")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.13";
+    private const string Version = "0.11.14";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
