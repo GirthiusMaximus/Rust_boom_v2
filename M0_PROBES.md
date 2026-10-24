@@ -791,7 +791,7 @@ Still unverified (these results decide the next step):
 
 ## Exact probe list, plugin v0.11.19 (2026-10-24)
 
-Reload only when no probe is running and no box is open. Check the banner says **v0.11.19**.
+Reload only when no probe is running and no box is open. Check the banner says **v0.11.20**.
 
 ### A. 6000 m map (loaded now)
 

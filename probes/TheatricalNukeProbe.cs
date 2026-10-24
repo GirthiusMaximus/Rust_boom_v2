@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.19.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.20.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.19")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.20")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.19";
+    private const string Version = "0.11.20";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -701,7 +701,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 var entity = item.Item2;
                 if (entity == null) sb.Append($" | {item.Item1}=null");
                 else if (entity.IsDestroyed) sb.Append($" | {item.Item1}=destroyed");
-                else sb.Append($" | {item.Item1}={Pos(entity.transform.position)} net={(entity.net != null ? entity.net.ID : 0u)}");
+                else sb.Append($" | {item.Item1}={Pos(entity.transform.position)} net={(entity.net != null ? entity.net.ID.ToString() : "none")}");
             }
 
             Line(run, "TICK", sb.ToString());
@@ -1347,7 +1347,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         Track(run, entity, "siren entity");
         entity.Spawn();
-        Line(run, "STEP", $"spawned {entity.GetType().Name} at {pos}; net id={(entity.net != null ? entity.net.ID : 0u)}");
+        Line(run, "STEP", $"spawned {entity.GetType().Name} at {pos}; net id={(entity.net != null ? entity.net.ID.ToString() : "none")}");
         DumpAudio(run, entity.gameObject, "live");
 
         timer.Once(2f, () => AudioCheck(run, entity, "+2 s"));
@@ -2329,7 +2329,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         cctv.transform.localScale = childScale;
         cctv.SendNetworkUpdateImmediate();
 
-        var parentId = parent.net != null ? parent.net.ID : 0u;
+        var parentId = parent.net != null ? parent.net.ID.ToString() : "none";
         Line(run, "CAMERA", $"{label}: parent net={parentId} localPos={Pos(localPos)} world={Pos(cctv.transform.position)} identifier='{((IRemoteControllable)cctv).GetIdentifier()}'");
         return cctv;
     }
@@ -2599,8 +2599,8 @@ public class TheatricalNukeProbe : CarbonPlugin
             {
                 entity.Spawn();
                 // Deliberately not tracked: killing it threw in run 7. The server entity is left for a restart.
-                Line(run, "NOTE", $"injected entity net id {(entity.net != null ? entity.net.ID : 0u)} is NOT killed by cleanup; expect it on the server until restart");
-                Line(run, "STEP", $"Spawn() returned; IsDestroyed={entity.IsDestroyed} net={(entity.net != null ? entity.net.ID : 0u)}");
+                Line(run, "NOTE", $"injected entity net id {(entity.net != null ? entity.net.ID.ToString() : "none")} is NOT killed by cleanup; expect it on the server until restart");
+                Line(run, "STEP", $"Spawn() returned; IsDestroyed={entity.IsDestroyed} net={(entity.net != null ? entity.net.ID.ToString() : "none")}");
                 Line(run, "RESULT", "Injected entity spawned. Operator: look 14 m in front at about 1 m. Report whether the silo missile body is visible.");
             }
             catch (Exception ex)
@@ -2816,7 +2816,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         bus.Spawn();
         Track(run, bus, "parent bus");
-        Line(run, "STEP", $"parent bus spawned at {Pos(pos)} (net id {(bus.net != null ? bus.net.ID : 0u)})");
+        Line(run, "STEP", $"parent bus spawned at {Pos(pos)} (net id {(bus.net != null ? bus.net.ID.ToString() : "none")})");
 
         var ps2 = target.GetParameters();
         var args = new object[ps2.Length];
@@ -2970,7 +2970,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         bus.Spawn();
         Track(run, bus, "networked parent");
-        Line(run, "STEP", $"networked parent {bus.GetType().Name} spawned at {Pos(busPos)} (net id {(bus.net != null ? bus.net.ID : 0u)})");
+        Line(run, "STEP", $"networked parent {bus.GetType().Name} spawned at {Pos(busPos)} (net id {(bus.net != null ? bus.net.ID.ToString() : "none")})");
         AuditComponents(run, bus.gameObject, "parent live");
 
         GameObject visual = null;
@@ -3028,7 +3028,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         bus.Spawn();
         Track(run, bus, "warhead bus");
-        Line(run, "STEP", $"warhead bus spawned at {Pos(pos)} (net id {(bus.net != null ? bus.net.ID : 0u)}); operator dist={Dist(pos, p):0.0} m");
+        Line(run, "STEP", $"warhead bus spawned at {Pos(pos)} (net id {(bus.net != null ? bus.net.ID.ToString() : "none")}); operator dist={Dist(pos, p):0.0} m");
 
         var transforms = bus.GetComponentsInChildren<Transform>(true);
         Line(run, "STEP", $"bus hierarchy: {transforms.Length} transform(s) including the root");
@@ -3106,7 +3106,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
             Line(run, "STEP", $"R1e {phase}: '{target.name}' activeSelf={target.gameObject.activeSelf} " +
                               $"activeInHierarchy={target.gameObject.activeInHierarchy} world={Pos(target.position)} " +
-                              $"bus={Pos(bus.transform.position)} net={(bus.net != null ? bus.net.ID : 0u)}");
+                              $"bus={Pos(bus.transform.position)} net={(bus.net != null ? bus.net.ID.ToString() : "none")}");
 
             if (phase == "hide")
             {
@@ -3328,7 +3328,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         carrier.Spawn();
         Track(run, carrier, "carrier entity");
-        Line(run, "STEP", $"carrier {carrier.GetType().Name} spawned at {Pos(carrierPos)} (net id {(carrier.net != null ? carrier.net.ID : 0u)})");
+        Line(run, "STEP", $"carrier {carrier.GetType().Name} spawned at {Pos(carrierPos)} (net id {(carrier.net != null ? carrier.net.ID.ToString() : "none")})");
         AuditComponents(run, carrier.gameObject, "carrier live");
 
         GameObject visual = null;
