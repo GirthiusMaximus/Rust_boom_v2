@@ -751,3 +751,12 @@ Notes:
 - **Operator observation (chat, /probe obs): "No missle was seen."** No visible spawn.
 - Box on v0.11.15: X closed the box (buttons respond now). The input field sent text at 10:10:59 (empty) and 10:11:06 ("tt", 2 characters), then the box closed without submitting. Submit not yet tested. The chat fallback `/probe obs` saved the observation.
 - Open: the input field sends its text on end-edit, and it sent after 2 characters. The cause is not yet known. Same family as the 79-character cut.
+
+## BOXTEST on v0.11.15 (session 10:14Z): box round trip works
+
+- Box opened from `/probe boxtest` with no `/probe end`. Good.
+- Operator typed a 59-character sentence. The input field sent it in one event at 10:14:35.007 and Submit saved it at 10:14:35.099. Observation saved, cleanup OK, 0 errors.
+- Submit works. The earlier 2-character "tt" send did not repeat.
+- Operator reports the box buttons were blank (no visible labels), so they used `/probe more` to submit. Rendering is not confirmed.
+- `/probe stop` was typed after the run. It is not a command in the plugin, and the log shows no reply.
+- The 199-character 0001 to 0040 string has still not been tested.
