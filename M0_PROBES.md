@@ -713,3 +713,19 @@ Position used for runs 8 to 11: operator about (-2065 to -2068, 15.5 to 16.2, 45
 **Box capture test (BOXTEST, 17:04):** the box sent 79 characters (0001 to 0016) and cut off before 0017. `/probe more` delivered 114 characters intact (0017 to 0039). Run 9 earlier delivered a 137-character observation intact, so the box has no fixed length limit. The text is lost in the client field at focus loss, cause not yet known. v0.11.9 echoes the captured length after each observation, so the operator can send the rest with `/probe more`.
 
 **BOXTEST, 2026-10-19 19:54 UTC (v0.11.8, session 195417):** a pasted 122-character lorem ipsum passage (16 words) reached the probe intact in one submit. No cut. The probe's test string was 0001 to 0040, so this was not the expected text. Earlier cuts (69 and 79 characters) came from typed input. The client `output_log.txt` has no entries near the 19:56:37 submit. The in-game console's Log File button opens `output_log.txt`.
+
+## debug.lookingat survey, silo area (operator, 2026-10-24, console 03:12 to 03:15Z)
+
+| Object (as shown) | Ent | Pos | Layer | Hierarchy | Note |
+|---|---|---|---|---|---|
+| nuclear_silo_missile | - | (-2073.35, 14.80, 344.41) | World | Props | Not an entity. |
+| hatch_body | door.hinged.nms_hatch | (-2066.39, 20.85, 345.22) | Construction | assets/bundled/prefabs/static/door.hinged.nms_hatch.prefab, root / main_piston_top / hatch_body | Networked entity; silo hatch. |
+| nuclear_silo_chute_platform_a (5) | - | (-2077.52, 7.79, 340.62) | World | Props | Not an entity. |
+| nuclear_silo_chute_vent_d (2) | - | (-2078.32, -1.28, 339.82) | World | Props | Not an entity. |
+| nuclear_silo_missile (second hit) | - | (-2074.61, 1.39, 341.03) | World | Props | Same object as the first hit (positions vary along its length). |
+
+Notes:
+- The silo missile is scene geometry under Props with no network entity. This matches the client refusals.
+- The silo hatch is a networked BaseEntity. It has not been checked for a missile child. Candidate for R1k/R1u follow-up.
+- The Log File button opened output_log.txt, as expected.
+- Nothing here establishes a spawn route. R1u (`/probe r1u`) is still pending.
