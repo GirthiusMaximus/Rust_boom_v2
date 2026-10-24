@@ -729,3 +729,14 @@ Notes:
 - The silo hatch is a networked BaseEntity. It has not been checked for a missile child. Candidate for R1k/R1u follow-up.
 - The Log File button opened output_log.txt, as expected.
 - Nothing here establishes a spawn route. R1u (`/probe r1u`) is still pending.
+
+## R1u (operator, 2026-10-24, session 03:21Z, plugin v0.11.14): partial, observation lost
+
+- Ran `/probe r1u` at 03:23:00Z. Log captured up to the observation box; the rest of the log is partial because the plugin was reloaded.
+- Operator observation: **nothing seen** 8 m in front. No visible spawn.
+- Tracked entities: 0. Cleanup items: 0. `CreateEntity` returned null again.
+- `CreatePrefab` (two overloads) returned local GameObjects only: Transform and MeshCollider, destroyed at once. Not networked.
+- The in-situ silo missile has no visual components, only a MeshCollider under `Missile_Chute/Props`. The server prefab root matches it. The server copy is collision-only.
+- Sweep gap: `GameManager.Instantiate(string, Vector3, Quaternion)` was not invoked. Fixed in v0.11.15 (`e153df7`); R1u must be re-run to complete the sweep.
+- Box failure (v0.11.14): buttons never reached the plugin; no submit or close entries. Fixed in v0.11.15 (buttons unprotected, keyboard capture removed, `/probe end` reopens a stuck box). Not yet verified in game.
+- Reload during the run: the unload path records the run as MISSING, so the observation is lost. Use `/probe end` rather than reloading.
