@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.21.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.22.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.21")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.22")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.21";
+    private const string Version = "0.11.22";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -92,6 +92,9 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const float FlightImpactBelowLaunch = 20f;  // bus is killed this far below the launch height (impact)
     private const float FlightTipOffset = 4f;           // m above the booster origin where the bus starts
     private const float FlightGravity = 9.81f;
+    private const float FlightBusApogeeFactor = 1.05f;  // bus climbs to 105% of the boost apogee after separation
+    private const float FlightBusRotateSeconds = 5f;    // bus turns slowly to the direction of travel after its apogee
+    private static readonly Vector3 FlightPlumeLocal = new Vector3(0f, 0f, -0.5f);  // booster-local: tail end (nose assumed +Z); 0.5 x 20 = 10 m on the server
     private const float FlightStepSeconds = 0.1f;   // 10 position updates a second; the 0.25 s step looked jerky on the bus
     private const float FlightLogSeconds = 1f;
     private const float FlightSpawnClearance = 20f;     // m above the ground under the launch point; the booster exploded when spawned at ground level
@@ -2059,7 +2062,9 @@ public class TheatricalNukeProbe : CarbonPlugin
         {
             var factor = ScaleRowFactors[i];
             var offset = (i - (count - 1) / 2f) * ScaleRowSpacingMetres;
-            var at = centre + right * offset;
+            var row = centre + right * offset;
+            var ground = GroundHeightAt(row, p.transform.position.y);
+            var at = new Vector3(row.x, ground + FlightSpawnClearance, row.z);
 
             var rocket = GameManager.server.CreateEntity(MlrsRocketPrefab, at, Quaternion.identity);
             if (rocket == null)
@@ -2071,9 +2076,9 @@ public class TheatricalNukeProbe : CarbonPlugin
             rocket.Spawn();
             Track(run, rocket, $"scale {factor:0}x");
             rocket.CancelInvoke();
-            rocket.transform.localScale = Vector3.one * factor;
-            rocket.SendNetworkUpdateImmediate();
-            Line(run, "SCALE", $"{factor:0}x at {Pos(at)} localScale={Pos(rocket.transform.localScale)} lossyScale={Pos(rocket.transform.lossyScale)} distance={Dist(at, p):0} m");
+            DisableRocketMotion(run, rocket);
+            SetReplicatedScale(run, rocket, Vector3.one * factor, $"scale {factor:0}x");
+            Line(run, "SCALE", $"{factor:0}x at {Pos(at)} (ground y={ground:0.00}) localScale={Pos(rocket.transform.localScale)} lossyScale={Pos(rocket.transform.lossyScale)} distance={Dist(at, p):0} m");
         }
 
         Line(run, "STEP", $"row of {count} static rockets, {ScaleRowSpacingMetres:0} m apart, {ScaleRowDistanceMetres:0} m in front, facing {Pos(forward)}");
@@ -2150,12 +2155,12 @@ public class TheatricalNukeProbe : CarbonPlugin
         Track(run, booster, "booster");
         // The rocket's own timed explosion would end the flight early. Cancel its scheduled calls (verified in the probe log).
         booster.CancelInvoke();
-        booster.transform.localScale = Vector3.one * FlightBoosterScale;
+        SetReplicatedScale(run, booster, Vector3.one * FlightBoosterScale, "booster");
         state.Booster = booster;
         DisableRocketMotion(run, booster);
-        booster.SendNetworkUpdateImmediate();
 
         Line(run, "STEP", $"booster {MlrsRocketPrefab} spawned at {Pos(state.Launch)} scale={FlightBoosterScale:0.0}x (localScale={Pos(booster.transform.localScale)}); CancelInvoke called");
+        state.Plume = SpawnFlightPlume(run, booster);
         Line(run, "STEP", $"ground at launch point y={groundY:0.00} m; spawn clearance {FlightSpawnClearance:0} m (booster y={state.Launch.y:0.00})");
         Line(run, "STEP", $"booster components: {string.Join(", ", booster.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name))}");
         Line(run, "STEP", state.Straight
@@ -2181,6 +2186,10 @@ public class TheatricalNukeProbe : CarbonPlugin
         public BaseEntity Bus;
         public BaseEntity BoosterCam;
         public BaseEntity BusCam;
+        public BaseEntity Plume;
+        public float BusTargetY;
+        public float BusApogeeAt = -1f;
+        public Quaternion BusRotateFrom = Quaternion.identity;
         public Vector3 Launch;
         public Vector3 Forward;
         public Vector3 BusVelocity;
@@ -2232,6 +2241,20 @@ public class TheatricalNukeProbe : CarbonPlugin
                 {
                     s.BusVelocity += Vector3.down * FlightGravity * FlightStepSeconds;
                     var busNext = s.Bus.transform.position + s.BusVelocity * FlightStepSeconds;
+                    if (s.BusApogeeAt < 0f && s.BusVelocity.y <= 0f)
+                    {
+                        s.BusApogeeAt = s.Elapsed;
+                        s.BusRotateFrom = s.Bus.transform.rotation;
+                        Line(run, "APOGEE", $"t={s.Elapsed:0.0}s bus apogee {busNext.y - s.Launch.y:0.0} m above the launch point (target {s.BusTargetY - s.Launch.y:0.0} m = {FlightBusApogeeFactor * 100f:0}% of the {s.ApogeeMetres:0} m boost apogee); rotating to the direction of travel over {FlightBusRotateSeconds:0.0} s");
+                    }
+                    var busRot = s.Bus.transform.rotation;
+                    if (s.BusApogeeAt >= 0f)
+                    {
+                        var turn = Mathf.Clamp01((s.Elapsed - s.BusApogeeAt) / FlightBusRotateSeconds);
+                        var travel = new Vector3(s.BusVelocity.x, 0f, s.BusVelocity.z);
+                        if (travel.sqrMagnitude < 1e-4f) travel = Vector3.down;
+                        busRot = Quaternion.Slerp(s.BusRotateFrom, FlightRotation(travel), turn);
+                    }
                     if (busNext.y < s.Launch.y - FlightImpactBelowLaunch)
                     {
                         Line(run, "IMPACT", $"t={s.Elapsed:0.0}s bus reached the ground near {Pos(s.Bus.transform.position)}; killed");
@@ -2239,7 +2262,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                     }
                     else
                     {
-                        MoveFlightEntity(s.Bus, busNext, s.Bus.transform.rotation);
+                        MoveFlightEntity(s.Bus, busNext, busRot);
                     }
                 }
 
@@ -2308,6 +2331,13 @@ public class TheatricalNukeProbe : CarbonPlugin
     {
         s.Separated = true;
 
+        // The plume belongs to the boost stage only.
+        if (s.Plume != null && !s.Plume.IsDestroyed)
+        {
+            Line(run, "PLUME", "boost stage over; plume killed at separation");
+            s.Plume.Kill();
+        }
+
         // The bus starts at the booster tip, in the direction of travel at burnout.
         var tip = s.Booster.transform.position + s.BurnoutDirection * FlightTipOffset;
         var bus = GameManager.server.CreateEntity(BusPrefab, tip, FlightRotation(s.BurnoutDirection));
@@ -2322,9 +2352,13 @@ public class TheatricalNukeProbe : CarbonPlugin
         DisableBodyPhysics(run, bus, "bus");
         bus.SendNetworkUpdateImmediate();
         s.Bus = bus;
-        s.BusVelocity = s.Forward * FlightBusSpeed;
+        // Vertical speed that stops the bus at 105% of the boost apogee: v = sqrt(2 g h).
+        s.BusTargetY = s.Launch.y + s.ApogeeMetres * FlightBusApogeeFactor;
+        var climbMetres = Mathf.Max(0.1f, s.BusTargetY - tip.y);
+        var climbSpeed = Mathf.Sqrt(2f * FlightGravity * climbMetres);
+        s.BusVelocity = s.Forward * FlightBusSpeed + Vector3.up * climbSpeed;
 
-        Line(run, "SEPARATION", $"t={s.Elapsed:0.0}s bus spawned at {Pos(tip)} (tip offset {FlightTipOffset:0.0} m); push {FlightBusSpeed:0.0} m/s toward {Pos(s.Forward)}{(s.Straight ? " (straight mode: no push)" : string.Empty)}");
+        Line(run, "SEPARATION", $"t={s.Elapsed:0.0}s bus spawned at {Pos(tip)} (tip offset {FlightTipOffset:0.0} m); push {FlightBusSpeed:0.0} m/s toward {Pos(s.Forward)}{(s.Straight ? " (straight mode: no push)" : string.Empty)}; climb {climbSpeed:0.0} m/s to {climbMetres:0.0} m higher, then fall");
 
         if (s.WithCam)
         {
@@ -2401,6 +2435,42 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         body.isKinematic = true;
         Line(run, "STEP", $"{label}: Rigidbody set kinematic (isKinematic={body.isKinematic}, useGravity={body.useGravity})");
+    }
+
+    // Scale only reaches clients when networkEntityScale is true (Carbon, October 2025 update: "The scale only gets networked
+    // if the BaseEntity.networkEntityScale is set to true"). Without it the 1x to 25x rockets looked the same (session 154435).
+    private void SetReplicatedScale(ProbeRun run, BaseEntity e, Vector3 scale, string label)
+    {
+        e.transform.localScale = scale;
+        e.networkEntityScale = true;
+        e.SendNetworkUpdateImmediate();
+        Line(run, "STEP", $"{label}: scale {Pos(scale)} sent with networkEntityScale=true (localScale now {Pos(e.transform.localScale)})");
+    }
+
+    private BaseEntity SpawnFlightPlume(ProbeRun run, BaseEntity booster)
+    {
+        var fire = GameManager.server.CreateEntity(PlumePrefab, booster.transform.position, Quaternion.identity) as FireBall;
+        if (fire == null)
+        {
+            Line(run, "RESULT", "plume: CreateEntity returned null or not a FireBall. Flight continues without a plume.");
+            return null;
+        }
+
+        // Neutered as in R9: no damage, no spread, no merge, long life. The plugin kills it at separation.
+        fire.damagePerSecond = 0f;
+        fire.generation = 1000f;
+        fire.canMerge = false;
+        fire.ignoreNPC = true;
+        fire.lifeTimeMin = 600f;
+        fire.lifeTimeMax = 600f;
+        fire.Spawn();
+        Track(run, fire, "booster plume");
+        fire.SetParent(booster, worldPositionStays: false);
+        fire.transform.localPosition = FlightPlumeLocal;
+        fire.transform.localRotation = Quaternion.identity;
+        fire.SendNetworkUpdateImmediate();
+        Line(run, "PLUME", $"booster plume parented at booster-local {Pos(FlightPlumeLocal)}; world={Pos(fire.transform.position)} (tail end; tune FlightPlumeLocal)");
+        return fire;
     }
 
     private static void MoveFlightEntity(BaseEntity e, Vector3 pos, Quaternion rot)

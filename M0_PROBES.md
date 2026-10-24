@@ -859,3 +859,33 @@ Check the banner says **v0.11.21**. Reload only when no probe is running and no 
 
 Check the banner shows the new `worldsize`. If the launch point is refused, walk toward the centre and run again.
 
+---
+
+## Session 154435 results (plugin v0.11.20, `/probe scales`, 6000 m map)
+
+| Finding | Evidence | Operator |
+|---|---|---|
+| Static rockets fell from the spawn height (84.96 m) to the ground (35.31 m). | TICK #1 positions; by TICK #2 all six were gone. | "The missile fall from where they are spawned so there is only a limited time to inspect them." |
+| Scale did not reach the client. | localScale 1x to 25x on the server; the client showed the same size. | "Their scale was also looked exactly the same on the client." |
+| Operator note | | "Needs to spawn safely above ground and be frozen in place, no change to scale." |
+
+Fix in v0.11.22: spawn 20 m above the ground found under each rocket, rocket motion off, and `networkEntityScale = true` before the update. Not yet confirmed in game.
+
+## Exact probe list, plugin v0.11.22 (2026-10-24)
+
+Check the banner says **v0.11.22**. Reload only when no probe is running and no box is open.
+
+### A. 6000 m map
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. | Banner. |
+| 2 | `/probe scales` | Walk to the row. Then `/probe scales end`. | Rockets stay where they spawn. Do the 1x to 25x sizes now differ on the client? Which one looks like an ICBM? |
+| 3 | `/probe flight apogee=1000` | Stand still. Run ends itself. | Booster climbs slowly, nose along travel. Plume at the tail end (tell me where it is relative to the body). Bus climbs to about 1050 m, turns over about 5 s, then falls. |
+| 4 | `/probe flight cam apogee=1000` | As step 3. | Chat gives the identifier. Same identifier shows the bus after separation? |
+| 5 | `/probe flight straight apogee=1000` | About 5 minutes. | Straight up, straight down. |
+| 6 | `/probe outstanding` | Submit each box. | Each observation saved. |
+| 7 | `/probe end` | Closes the session. | Summary. |
+
+### B. Smaller map (load it, reload the plugin, then repeat steps 2, 3, 6 and 7)
+
