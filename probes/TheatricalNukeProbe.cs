@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.15.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.16.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.15")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.16")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.15";
+    private const string Version = "0.11.16";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -77,7 +77,23 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT" };
+    private const string MlrsRocketPrefab = "assets/content/vehicles/mlrs/rocket_mlrs.prefab";
+    private const float FlightBoosterScale = 6f;        // booster body scale; replication to clients is unverified
+    private const float FlightBoostSeconds = 30f;
+    private const float FlightApogeeMetres = 300f;
+    private const float FlightDownrangeMetres = 600f;
+    private const float FlightBusSpeed = 40f;           // m/s forward push at separation
+    private const float FlightBoosterDriftSpeed = 5f;   // m/s forward drift after separation
+    private const float FlightBoosterDescentRate = 3f;  // m/s slow descent after separation
+    private const float FlightDescentSeconds = 120f;
+    private const float FlightTipOffset = 4f;           // m above the booster origin where the bus starts
+    private const float FlightGravity = 9.81f;
+    private const float FlightStepSeconds = 0.25f;
+    private const float FlightLogSeconds = 1f;
+    private static readonly Vector3 FlightBoosterCamLocal = new Vector3(0.6f, 0f, -0.2f);  // in booster local space
+    private static readonly Vector3 FlightBusCamLocal = new Vector3(0f, 0.5f, 1f);         // in bus local space
+    private static readonly Vector3 FlightCamEuler = new Vector3(60f, 0f, 0f);             // pitched down
     private static readonly float[] MarkerRadii = { 0.01f, 0.025f, 0.05f, 0.1f, 0.25f };
 
     private static TheatricalNukeProbe _instance;
@@ -247,7 +263,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 return;
             }
 
-            if (first.Equals("abort", StringComparison.OrdinalIgnoreCase))
+            if (first.Equals("abort", StringComparison.OrdinalIgnoreCase) || first.Equals("stop", StringComparison.OrdinalIgnoreCase))
             {
                 if (_active == null) player.ChatMessage("No probe running.");
                 else EndProbe(_active, "aborted by operator", null, player, false);
@@ -323,6 +339,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("R4 <path> [x y z]   R5 [smoke seconds]   R6 [metres]   R6b [path] [x y z]   R6c [path]");
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
+        player.ChatMessage("Flight: /probe flight [cam] runs boost, bus separation and booster descent, logging positions. /probe stop = abort.");
         player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)   R1r prefab id before Spawn, no Harmony   R1s wider Harmony write-path interception   R1t silo prefab via CreateEntity   BOXTEST observation box capture test   R1u final in-situ inspection and every spawn method");
         player.ChatMessage("Also: /probe abort");
     }
@@ -494,6 +511,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1t": ProbeR1t(run, op); break;
                 case "BOXTEST": ProbeBoxTest(run, op); break;
                 case "R1u": ProbeR1u(run, op); break;
+                case "FLIGHT": ProbeFlight(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -822,7 +840,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         cui.v2.CreateText(box, new LuiPosition(0.03f, 0.89f, 0.88f, 0.98f), LuiOffset.None, 15, "1 1 1 1", title, TextAnchor.UpperLeft);
 
         var close = cui.v2.CreateButton(box, new LuiPosition(0.92f, 0.90f, 0.98f, 0.98f), LuiOffset.None, ObsCmdClose, "0.6 0.1 0.1 1", isProtected: false);
-        cui.v2.CreateText(close, LuiPosition.None, LuiOffset.None, 16, "1 1 1 1", "X");
+        cui.v2.CreateText(close, LuiPosition.Full, LuiOffset.None, 16, "1 1 1 1", "X");
 
         var input = cui.v2.CreateInput(box, new LuiPosition(0.03f, 0.22f, 0.97f, 0.86f), LuiOffset.None, "1 1 1 1", prefill, 14, ObsCmdText,
             charLimit: MaxObservationChars, isProtected: false, alignment: TextAnchor.UpperLeft);
@@ -830,10 +848,10 @@ public class TheatricalNukeProbe : CarbonPlugin
         input.SetInputKeyboard(true);
 
         var add = cui.v2.CreateButton(box, new LuiPosition(0.03f, 0.03f, 0.32f, 0.12f), LuiOffset.None, ObsCmdAdd, "0.2 0.35 0.65 1", isProtected: false);
-        cui.v2.CreateText(add, LuiPosition.None, LuiOffset.None, 14, "1 1 1 1", "Add part (keep typing)");
+        cui.v2.CreateText(add, LuiPosition.Full, LuiOffset.None, 14, "1 1 1 1", "Add part (keep typing)");
 
         var submit = cui.v2.CreateButton(box, new LuiPosition(0.35f, 0.03f, 0.65f, 0.12f), LuiOffset.None, ObsCmdSubmit, "0.15 0.55 0.2 1", isProtected: false);
-        cui.v2.CreateText(submit, LuiPosition.None, LuiOffset.None, 16, "1 1 1 1", "Submit observation");
+        cui.v2.CreateText(submit, LuiPosition.Full, LuiOffset.None, 16, "1 1 1 1", "Submit observation");
 
         cui.v2.SendUi(player);
     }
@@ -1998,6 +2016,210 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         // Ends the run at once and opens the box, so no /probe end is needed. Cleanup has nothing to undo (no game action).
         EndProbe(run, "box test: observation box opened for typed text", null, p, true);
+    }
+
+    // ── FLIGHT: plugin-calculated boost, bus separation and booster descent ──────────────────────
+    // The booster is a vanilla rocket_mlrs scaled up. The bus is nuclear_warhead.prefab. The plugin
+    // calculates every position and moves each entity itself. Positions are logged every second.
+    // Unverified (the log will show each one): scale replication to clients, the rocket's own timed
+    // explosion, and whether SendNetworkUpdateImmediate moves the entity for distant players.
+    // Usage: /probe flight            booster and bus only
+    //        /probe flight cam        also a CCTV camera as a child of the booster, moved to the bus at separation
+    private void ProbeFlight(ProbeRun run, BasePlayer p)
+    {
+        var withCam = run.Args.Any(a => a.Equals("cam", StringComparison.OrdinalIgnoreCase));
+        run.TimeoutSeconds = FlightBoostSeconds + FlightDescentSeconds + 30f;
+
+        var forward = Vector3.ProjectOnPlane(p.transform.forward, Vector3.up);
+        if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+        forward.Normalize();
+
+        var state = new FlightState { Launch = InFront(p, 30f, 0f), Forward = forward, WithCam = withCam };
+
+        var booster = GameManager.server.CreateEntity(MlrsRocketPrefab, state.Launch, Quaternion.identity);
+        if (booster == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null for rocket_mlrs. Nothing spawned.");
+            return;
+        }
+
+        booster.Spawn();
+        Track(run, booster, "booster");
+        // The rocket's own timed explosion would end the flight early. Cancel its scheduled calls (verified in the probe log).
+        booster.CancelInvoke();
+        booster.transform.localScale = Vector3.one * FlightBoosterScale;
+        booster.SendNetworkUpdateImmediate();
+        state.Booster = booster;
+
+        Line(run, "STEP", $"booster {MlrsRocketPrefab} spawned at {Pos(state.Launch)} scale={FlightBoosterScale:0.0}x (localScale={Pos(booster.transform.localScale)}); CancelInvoke called");
+        Line(run, "STEP", $"booster components: {string.Join(", ", booster.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name))}");
+        Line(run, "STEP", $"plan: boost {FlightBoostSeconds:0} s, apogee {FlightApogeeMetres:0} m, downrange {FlightDownrangeMetres:0} m toward {Pos(forward)}; bus at separation, booster descends at {FlightBoosterDescentRate:0.0} m/s");
+
+        if (withCam)
+        {
+            state.BoosterCam = SpawnFlightCamera(run, booster, FlightBoosterCamLocal, Vector3.one / FlightBoosterScale, "booster cam", FlightCamEuler);
+        }
+
+        timer.Once(FlightStepSeconds, () => FlightStep(run, p, state));
+    }
+
+    private sealed class FlightState
+    {
+        public BaseEntity Booster;
+        public BaseEntity Bus;
+        public BaseEntity BoosterCam;
+        public BaseEntity BusCam;
+        public Vector3 Launch;
+        public Vector3 Forward;
+        public Vector3 BusVelocity;
+        public bool WithCam;
+        public bool Separated;
+        public float Elapsed;
+        public float NextLog;
+    }
+
+    private void FlightStep(ProbeRun run, BasePlayer op, FlightState s)
+    {
+        if (run.Ended) return;
+
+        s.Elapsed += FlightStepSeconds;
+        try
+        {
+            var boosterAlive = s.Booster != null && !s.Booster.IsDestroyed;
+            if (!boosterAlive && !s.Separated)
+            {
+                EndProbe(run, "flight ended early: booster destroyed before separation", null, op, false);
+                return;
+            }
+
+            if (!s.Separated)
+            {
+                // Boost: ease-out climb to apogee over FlightBoostSeconds, with downrange travel.
+                var t = Mathf.Min(s.Elapsed / FlightBoostSeconds, 1f);
+                var height = FlightApogeeMetres * (1f - (1f - t) * (1f - t));
+                var pos = s.Launch + Vector3.up * height + s.Forward * (FlightDownrangeMetres * t);
+                MoveFlightEntity(s.Booster, pos);
+
+                if (s.Elapsed >= FlightBoostSeconds) FlightSeparate(run, op, s);
+            }
+            else
+            {
+                // Bus: its own arc under gravity. Booster: slow drift and descent.
+                if (s.Bus != null && !s.Bus.IsDestroyed)
+                {
+                    s.BusVelocity += Vector3.down * FlightGravity * FlightStepSeconds;
+                    MoveFlightEntity(s.Bus, s.Bus.transform.position + s.BusVelocity * FlightStepSeconds);
+                }
+
+                if (boosterAlive)
+                {
+                    var drift = s.Forward * FlightBoosterDriftSpeed + Vector3.down * FlightBoosterDescentRate;
+                    MoveFlightEntity(s.Booster, s.Booster.transform.position + drift * FlightStepSeconds);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, "flight step", ex);
+            Line(run, "ERROR", "flight step threw; see probe-errors.log. Cleanup runs when the probe ends.");
+            EndProbe(run, "flight ended: step error", null, op, false);
+            return;
+        }
+
+        if (s.Elapsed >= s.NextLog)
+        {
+            s.NextLog = s.Elapsed + FlightLogSeconds;
+            LogFlight(run, s);
+        }
+
+        if (s.Elapsed >= FlightBoostSeconds + FlightDescentSeconds)
+        {
+            LogFlight(run, s);
+            EndProbe(run, "flight complete", null, op, false);
+            return;
+        }
+
+        timer.Once(FlightStepSeconds, () => FlightStep(run, op, s));
+    }
+
+    private void FlightSeparate(ProbeRun run, BasePlayer op, FlightState s)
+    {
+        s.Separated = true;
+        if (s.BoosterCam != null && !s.BoosterCam.IsDestroyed)
+        {
+            Line(run, "SEPARATION", "booster cam destroyed at separation (FR-61)");
+            s.BoosterCam.Kill();
+        }
+
+        // The bus starts at the booster tip and is pushed forward, then follows gravity.
+        var tip = s.Booster.transform.position + Vector3.up * FlightTipOffset;
+        var bus = GameManager.server.CreateEntity(BusPrefab, tip, Quaternion.identity);
+        if (bus == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null for the bus prefab. Booster continues alone.");
+            return;
+        }
+
+        bus.Spawn();
+        Track(run, bus, "bus");
+        bus.SendNetworkUpdateImmediate();
+        s.Bus = bus;
+        s.BusVelocity = s.Forward * FlightBusSpeed;
+
+        Line(run, "SEPARATION", $"t={s.Elapsed:0.0}s bus spawned at {Pos(tip)} (tip offset {FlightTipOffset:0.0} m); push {FlightBusSpeed:0.0} m/s toward {Pos(s.Forward)}");
+
+        if (s.WithCam)
+        {
+            s.BusCam = SpawnFlightCamera(run, bus, FlightBusCamLocal, Vector3.one, "bus cam", FlightCamEuler);
+        }
+    }
+
+    private static void MoveFlightEntity(BaseEntity e, Vector3 pos)
+    {
+        e.transform.position = pos;
+        e.SendNetworkUpdateImmediate();
+    }
+
+    private BaseEntity SpawnFlightCamera(ProbeRun run, BaseEntity parent, Vector3 localPos, Vector3 childScale, string label, Vector3 localEuler)
+    {
+        var cctv = GameManager.server.CreateEntity(CctvPrefab, parent.transform.position, Quaternion.identity) as CCTV_RC;
+        if (cctv == null)
+        {
+            Line(run, "RESULT", $"{label}: CreateEntity returned null or not a CCTV_RC");
+            return null;
+        }
+
+        cctv.rcIdentifier = "NUKE#ID";
+        cctv.Spawn();
+        Track(run, cctv, label);
+        cctv.SetParent(parent, worldPositionStays: false);
+        cctv.transform.localPosition = localPos;
+        cctv.transform.localRotation = Quaternion.Euler(localEuler);
+        cctv.transform.localScale = childScale;
+        cctv.SendNetworkUpdateImmediate();
+
+        var parentId = parent.net != null ? parent.net.ID : 0u;
+        Line(run, "CAMERA", $"{label}: parent net={parentId} localPos={Pos(localPos)} world={Pos(cctv.transform.position)} identifier='{((IRemoteControllable)cctv).GetIdentifier()}'");
+        return cctv;
+    }
+
+    private void LogFlight(ProbeRun run, FlightState s)
+    {
+        var boosterText = s.Booster != null && !s.Booster.IsDestroyed ? Pos(s.Booster.transform.position) : "gone";
+        var busText = s.Bus != null && !s.Bus.IsDestroyed ? Pos(s.Bus.transform.position) : (s.Separated ? "gone" : "not yet");
+        var sb = new StringBuilder();
+        sb.Append($"t={s.Elapsed:0.0}s phase={(s.Separated ? "bus-separated" : "boost")} booster={boosterText} bus={busText}");
+        if (s.Booster != null && !s.Booster.IsDestroyed)
+            sb.Append($" boosterScale={Pos(s.Booster.transform.localScale)} boosterLossy={Pos(s.Booster.transform.lossyScale)}");
+        sb.Append(" | distances:");
+        foreach (var online in BasePlayer.activePlayerList.ToList())
+        {
+            if (online == null || online.IsDestroyed) continue;
+            var sample = s.Booster != null && !s.Booster.IsDestroyed ? s.Booster.transform.position : s.Launch;
+            sb.Append($" {online.displayName}={Dist(sample, online):0}m");
+        }
+
+        Line(run, "FLIGHT", sb.ToString());
     }
 
     // ── R1u: final attempt. Inspect the in-situ silo missile, list every spawn-like method, try each one. ──
