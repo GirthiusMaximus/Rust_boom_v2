@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.14.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.15.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.14")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.15")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.14";
+    private const string Version = "0.11.15";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -227,11 +227,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                     return;
                 }
 
-                if (_boxOpen)
-                {
-                    player.ChatMessage($"The box is already open for {_pendingObs[0].Id}. Submit it to move to the next one.");
-                    return;
-                }
+                if (_boxOpen) CloseBox(player, "reopened by /probe outstanding");
 
                 SessionLine("COLLECT", $"/probe outstanding: {_pendingObs.Count} observation(s), starting with {_pendingObs[0].Id}");
                 player.ChatMessage($"{_pendingObs.Count} observation(s) outstanding. Opening {_pendingObs[0].Id} first; each submit opens the next.");
@@ -398,8 +394,9 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         if (_boxOpen)
         {
-            player?.ChatMessage($"{_pendingObs.Count} observation(s) outstanding. The box is open for {_pendingObs[0].Id}. Submit it, or close it with X and use /probe end again.");
-            return;
+            // The box is stuck open (its buttons did not answer). Close it here and reopen the next one.
+            SessionLine("BOX", "box was open when /probe end ran: closing it and reopening");
+            CloseBox(player, "reopened by /probe end");
         }
 
         player?.ChatMessage($"{_pendingObs.Count} observation(s) outstanding. Collecting now, starting with {_pendingObs[0].Id}.");
@@ -820,23 +817,22 @@ public class TheatricalNukeProbe : CarbonPlugin
         var root = cui.v2.CreateParent(CUI.ClientPanels.Overlay, LuiPosition.Full, ObsBoxName);
         var overlay = cui.v2.CreatePanel(root, LuiPosition.Full, LuiOffset.None, "0 0 0 0.92");
         overlay.AddCursor();
-        overlay.AddKeyboard();
 
         var box = cui.v2.CreatePanel(overlay, new LuiPosition(0.22f, 0.16f, 0.78f, 0.86f), LuiOffset.None, "0.05 0.05 0.05 0.98");
         cui.v2.CreateText(box, new LuiPosition(0.03f, 0.89f, 0.88f, 0.98f), LuiOffset.None, 15, "1 1 1 1", title, TextAnchor.UpperLeft);
 
-        var close = cui.v2.CreateButton(box, new LuiPosition(0.92f, 0.90f, 0.98f, 0.98f), LuiOffset.None, ObsCmdClose, "0.6 0.1 0.1 1");
+        var close = cui.v2.CreateButton(box, new LuiPosition(0.92f, 0.90f, 0.98f, 0.98f), LuiOffset.None, ObsCmdClose, "0.6 0.1 0.1 1", isProtected: false);
         cui.v2.CreateText(close, LuiPosition.None, LuiOffset.None, 16, "1 1 1 1", "X");
 
         var input = cui.v2.CreateInput(box, new LuiPosition(0.03f, 0.22f, 0.97f, 0.86f), LuiOffset.None, "1 1 1 1", prefill, 14, ObsCmdText,
-            charLimit: MaxObservationChars, alignment: TextAnchor.UpperLeft);
+            charLimit: MaxObservationChars, isProtected: false, alignment: TextAnchor.UpperLeft);
         input.SetInputAutoFocus(true);
         input.SetInputKeyboard(true);
 
-        var add = cui.v2.CreateButton(box, new LuiPosition(0.03f, 0.03f, 0.32f, 0.12f), LuiOffset.None, ObsCmdAdd, "0.2 0.35 0.65 1");
+        var add = cui.v2.CreateButton(box, new LuiPosition(0.03f, 0.03f, 0.32f, 0.12f), LuiOffset.None, ObsCmdAdd, "0.2 0.35 0.65 1", isProtected: false);
         cui.v2.CreateText(add, LuiPosition.None, LuiOffset.None, 14, "1 1 1 1", "Add part (keep typing)");
 
-        var submit = cui.v2.CreateButton(box, new LuiPosition(0.35f, 0.03f, 0.65f, 0.12f), LuiOffset.None, ObsCmdSubmit, "0.15 0.55 0.2 1");
+        var submit = cui.v2.CreateButton(box, new LuiPosition(0.35f, 0.03f, 0.65f, 0.12f), LuiOffset.None, ObsCmdSubmit, "0.15 0.55 0.2 1", isProtected: false);
         cui.v2.CreateText(submit, LuiPosition.None, LuiOffset.None, 16, "1 1 1 1", "Submit observation");
 
         cui.v2.SendUi(player);
@@ -2054,7 +2050,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         if (gm == null) { Line(run, "RESULT", "GameManager.server is null. No spawn attempted."); return; }
 
         var creators = typeof(GameManager).GetMethods(flags)
-            .Where(m => !m.IsSpecialName && (m.Name.StartsWith("Create") || m.Name.StartsWith("Spawn")))
+            .Where(m => !m.IsSpecialName && (m.Name.StartsWith("Create") || m.Name.StartsWith("Spawn") || m.Name.StartsWith("Instantiate")))
             .Where(m => { var ps = m.GetParameters(); return ps.Length >= 3 && ps[0].ParameterType == typeof(string) && ps[1].ParameterType == typeof(Vector3) && ps[2].ParameterType == typeof(Quaternion); })
             .ToList();
         Line(run, "STEP", $"GameManager methods taking (string, Vector3, Quaternion): {creators.Count}");
