@@ -821,3 +821,41 @@ Reload only when no probe is running and no box is open. Check the banner says *
 Centring check (Q-K): in the log, your position should lie between -half and +half on both axes. If you stand near a map corner and your coordinates fall outside that range, the map is not centred on 0. Send the log.
 
 Commands that can be used at any time: `/probe stop` (aborts the running probe).
+
+---
+
+## Session 151600 results (plugin v0.11.20, 2026-10-24, 6000 m map)
+
+| Run | Finding | Operator observation |
+|---|---|---|
+| FLIGHT cam, runs 1 and 2 | Booster destroyed in 0.25 s, before separation. Launch at ground level (player y 4.04). | "MIssile instantly exploded on spawn." / "Still exploded instantly when higher up." |
+| FLIGHT 600 m, run 1 | Same at y 4.18. A launch at y 25.28 (later run) was not destroyed. | "Immediately destroyed, if spawn point is too close to the ground spawn higher in air." |
+| FLIGHT cam, run 3 (y 103.96) | Booster climbed, separated, bus fell. Booster fell about 125 m/s after separation, not 3 m/s. | "Missile shoots directly down." "Too close to ground." |
+| FLIGHT cam (y 29.34) | Camera ID in the probe log only, not in chat. Camera lost at separation (new camera, new ID). | "Was unable to view CCTV in time, CAM ID needs to be output in chat." / "Camera should transfer to the bus." |
+| FLIGHT apogee 600 | Bus travel jerky; hard to track. Requested: ddraw markers. | "Due to how jerky bus travel is it was difficult to track." |
+| FLIGHT | Booster should keep its travel direction; should rise slowly from the ground and gain speed with altitude. | "Rotation of missile should follow direction of travel." / "raises from the ground ... slowly ... gradually gain speed". |
+| BOXTEST 199 characters | The box kept three parts (79, 79 and 78 characters), then the submitted field held "disregard." (10 characters). The 199-character string was not submitted as one piece. | "if i paste in something ... it seems to get" (cut off). |
+
+Changes in v0.11.21 are in DESIGN_BRIEF.md change log row 0.11. Open questions are listed there.
+
+## Exact probe list, plugin v0.11.21 (2026-10-24)
+
+Check the banner says **v0.11.21**. Reload only when no probe is running and no box is open.
+
+### A. 6000 m map
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. | Banner. |
+| 2 | `/probe flight apogee=1000` | Run ends itself. Stand still. | Booster should not explode at spawn. Note the "ground at launch point" and "spawn clearance" lines. Note whether the nose points along travel and whether the climb starts slowly. Note the "projectile disabled" and "Rigidbody" lines. Note the distance at which the booster disappears. |
+| 3 | `/probe flight cam apogee=1000` | As step 2. | Chat gives the booster CCTV identifier. Open a computer station with that identifier. Does the same identifier show the bus after separation? |
+| 4 | `/probe flight straight apogee=1000` | Run ends itself (about 5 minutes: the booster descends at 3 m/s). | Booster should climb straight up and descend straight down. Bus should fall straight down. Booster should disappear at ground level. |
+| 5 | `/probe flight straight cam apogee=1000` | As step 4. | Camera identifier in chat. Does it stay with the bus? |
+| 6 | Watch the ddraw markers (red booster, cyan bus) during 2 to 5. | | Do the markers stay on the moving entity? |
+| 7 | `/probe outstanding` | Submit each box in turn. | Each observation is saved. |
+| 8 | `/probe end` | Closes the session. | Summary. |
+
+### B. Smaller map (load it, reload the plugin, then repeat steps 1, 2, 4 and 7 and 8)
+
+Check the banner shows the new `worldsize`. If the launch point is refused, walk toward the centre and run again.
+

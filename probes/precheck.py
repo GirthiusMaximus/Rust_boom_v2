@@ -269,10 +269,10 @@ def selftest():
         "probe missing from KnownIds": ('"FLIGHT", "SCALES" }', '"SCALES" }'),
         "CS0173 NetworkableId vs uint": ('var parentId = parent.net != null ? parent.net.ID.ToString() : "none";',
                                          "var parentId = parent.net != null ? parent.net.ID : 0u;"),
-        "CS0128 duplicate local": ("        var half = MapHalfSize();\n        var launch = InFront(p, 30f, 0f);",
-                                   "        var half = MapHalfSize();\n        var launch = InFront(p, 30f, 0f);\n        var half = 1f;"),
-        "CS0136 shadowed local": ("        var half = MapHalfSize();\n        var launch = InFront(p, 30f, 0f);",
-                                  "        var half = MapHalfSize();\n        var launch = InFront(p, 30f, 0f);\n        if (launch.x > 0) { var half = 1f; }"),
+        "CS0128 duplicate local": ("        var half = MapHalfSize();\n        var launchOnGround = InFront(p, 30f, 0f);",
+                                   "        var half = MapHalfSize();\n        var launchOnGround = InFront(p, 30f, 0f);\n        var half = 1f;"),
+        "CS0136 shadowed local": ("        var half = MapHalfSize();\n        var launchOnGround = InFront(p, 30f, 0f);",
+                                  "        var half = MapHalfSize();\n        var launchOnGround = InFront(p, 30f, 0f);\n        if (launchOnGround.x > 0) { var half = 1f; }"),
         "missing Oxide CUI using": ("using Oxide.Game.Rust.Cui;", ""),
     }
     failed = 0
