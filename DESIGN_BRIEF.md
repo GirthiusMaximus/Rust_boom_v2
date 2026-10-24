@@ -99,7 +99,7 @@ Measurable, checked at the end of each milestone:
 | **Call** | The act of the thrown signal landing and beginning to smoke; this is the moment the strike becomes committed. |
 | **Target point** | World position where the smoke is emitted = where the real MIRV detonates. |
 | **Launch point** | Computed water position on the opposite side of the map from the target. |
-| **Booster** | The boost-phase body: vanilla `rocket_mlrs.prefab` scaled up (default 6×) to read as a nuclear missile (FR-25a). Replaces the silo missile, which clients refuse (FR-25). |
+| **Booster** | The boost-phase body: vanilla `rocket_mlrs.prefab` scaled up (default 20×) to read as a nuclear missile (FR-25a). Replaces the silo missile, which clients refuse (FR-25). |
 | **Bus** | The post-boost vehicle spawned at the booster tip at the end of boost (FR-31), carrying the MIRVs; visible only as a small glinting object. |
 | **MIRV** | One of six reentry vehicles: 5 decoys + 1 live. Vanilla `rocket_mlrs` prefab. |
 | **Phase** | One of `Idle → Armed → Warning → Breach → Boost → Midcourse → BusFlight → Reentry → Impact → Cleanup`. |
@@ -217,7 +217,7 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | ID | Pri | Requirement |
 |---|---|---|
 | FR-25 | M | **Superseded (operator, 2026-10-24).** The silo missile prefab cannot be spawned for a client (R1 to R1u, `M0_PROBES.md`). The boost body is now the scaled MLRS rocket in FR-25a. Decision Q-G. The silo prefab is not used. |
-| FR-25a | M | The boost-phase body is `assets/content/vehicles/mlrs/rocket_mlrs.prefab`, scaled by `Visuals.BoosterScale` (default 6). |
+| FR-25a | M | The boost-phase body is `assets/content/vehicles/mlrs/rocket_mlrs.prefab`, scaled by `Visuals.BoosterScale` (default 20; 10× was accepted in an earlier plugin, 20× is the next test). |
 | FR-25b | M | The plugin calculates the boost path (ease-out climb to apogee over the boost time, with downrange travel toward the target) and moves the booster itself each step. Defaults are set in the FLIGHT probe; config keys come in M3. |
 | FR-25c | M | **Unverified:** whether a server-side scale replicates to clients. The FLIGHT probe logs `localScale` and `lossyScale`. If clients show the rocket unscaled, Q-H applies. |
 | FR-25d | M | **Operator requirement:** the booster and bus are networked to **all players regardless of location**. **Unverified:** the references do not verify a route to global visibility (group 0 is global, `Rust.MD` §5.1). The FLIGHT probe logs the distance to every online player. Decision Q-I. |
@@ -234,7 +234,7 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | FR-30 | M | At **80 % of apogee** the four booster effects stop. |
 | FR-31 | M | At the **end of the boost phase** the bus is spawned at the booster tip, pushed forward in front of the booster (`Bus.PushSpeed`, default 40 m/s), then follows a gravity arc. |
 | FR-32 | M | The bus arc hits the **same impact point** with `apogee × 1.02` and `speed × 1.10`. |
-| FR-33 | M | The booster is **not removed** at hand-off. After separation it drifts forward and descends slowly (drift 5 m/s, descent 3 m/s by default). **Open (Q-J):** the operator wrote both "float out of the map" and "slow descent to earth"; this is built as a slow descent and needs confirming. |
+| FR-33 | M | The booster is **not removed** at hand-off. After separation it descends slowly (3 m/s) while drifting away from the launch side (20 m/s). It is **killed once it is 300 m past the edge of the play area** (map edge ±3000 m, assumed centred on 0; the probe logs this). The bus falls under gravity and is killed at impact height. |
 | FR-34 | M | The hand-off is **atomic from the player's perspective**: no frame where no missile exists and no frame where two exist at the same place. |
 | FR-35 | S | A short separation flash/effect masks the swap. `Q4` |
 
@@ -351,7 +351,7 @@ filled in; the rest are marked `ASSET-TBD`.
     "MissilePrefab": "assets/content/structures/nuclear_missile_silo/nuclear_silo_missile.prefab",
     "BusPrefab": "assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab",
     "BoosterPrefab": "assets/content/vehicles/mlrs/rocket_mlrs.prefab",
-    "BoosterScale": 6.0,
+    "BoosterScale": 20.0,
     "BoosterNozzleEffect": "assets/prefabs/npc/m2bradley/oilfireball2.prefab",
     "BoosterNozzleCount": 4,
     "WaterExitEffect": "assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab",
@@ -558,7 +558,7 @@ if a required prefab is missing.
 
 | Slot | Config key | Status | Notes |
 |---|---|---|---|
-| Booster body | `Visuals.BoosterPrefab` | ✅ given (operator, 2026-10-24) | `assets/content/vehicles/mlrs/rocket_mlrs.prefab`, scaled by `Visuals.BoosterScale` (default 6). Replaces the silo missile (FR-25). |
+| Booster body | `Visuals.BoosterPrefab` | ✅ given (operator, 2026-10-24) | `assets/content/vehicles/mlrs/rocket_mlrs.prefab`, scaled by `Visuals.BoosterScale` (default 20; 10× was accepted in an earlier plugin, 20× is the next test). Replaces the silo missile (FR-25). |
 | Bus | `Visuals.BusPrefab` | ✅ given | `assets/bundled/prefabs/modding/events/twitch/nuclear_warhead.prefab` — spawnability unconfirmed (R8) |
 | Booster plumes ×4 | `Visuals.BoosterNozzleEffect` | ✅ given | `assets/prefabs/npc/m2bradley/oilfireball2.prefab` — a `FireBall` entity, needs neutering (R9) |
 | Water-exit cue | `Visuals.WaterExitEffect` | ✅ given | `assets/content/effects/explosions/underwater/explosion_underwater_surface_large.prefab` |
@@ -654,7 +654,7 @@ Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_P
 | Q-G | Boost body: silo missile or scaled MLRS rocket? | The silo prefab cannot be spawned for a client (R1 to R1u). | **Decided (operator, 2026-10-24):** scaled `rocket_mlrs.prefab`. FR-25 superseded. |
 | Q-H | Does a server-side scale replicate to clients? | The booster must look like a nuclear missile, not an MLRS rocket. | Open. Probe FLIGHT logs the scale; the operator's view decides. A fallback is needed if it does not replicate. |
 | Q-I | Can a networked booster and bus be seen by all players, regardless of location? | Operator requirement. Visibility for normal entities is per watcher and not verified. | Open. Probe FLIGHT logs the distance to every online player. Needs a second player to test. |
-| Q-J | After separation, does the booster "float out of the map" or make a "slow descent to earth"? | Both were written. | Open. Built as a slow drift and descent. Confirm. |
+| Q-J | After separation, does the booster "float out of the map" or make a "slow descent to earth"? | Both were written. | **Decided (operator, 2026-10-24):** both. It descends slowly, drifts far enough outside the play area, then is killed. |
 
 ### 13.3 Work items created by the answers
 
@@ -711,6 +711,7 @@ amended if reality disagreed.
 | 0.5 | 2026-10-18 | Operator answers: siren audible again at about 2000 m from spawn (Q-C). R7 sweep set to 0.01–0.25 (Q-E). Probe v0.7.0 adds R1c manifest search, R1f silo parent test, R7 move (moving marker). Missile body route still open; R1c/R1f decide between a networked parent that already carries the missile, and options A/B/C. | Build agent |
 | 0.6 | 2026-10-18 | Operator run 7: the initial missile on ascent and boost must use `nuclear_silo_missile.prefab` (FR-25 locked; decision Q-F). Any spawned route must be killable after the test. Probe v0.11.0 adds R1g–R1o: effect routes, scene search, prefab audit, networked child scan, component injection, Carbon `ClientEntity` (killable, moves) and an effect parented to an entity (killable). Body route still open pending run-7 results. | Build agent |
 | 0.7 | 2026-10-24 | Operator: the silo prefab cannot be spawned for a client, so the booster is now a scaled `rocket_mlrs.prefab` (FR-25 superseded, Q-G). Bus spawns at end of boost and is pushed forward (FR-31). Booster drifts and descends instead of being removed (FR-33, Q-J). Booster and bus must reach all players regardless of location (FR-25d, Q-I). Camera is a child of the booster (FR-60). Probe v0.11.16 adds FLIGHT [cam]; box labels, `/probe stop`, and `probes/precheck.py` pre-presentation checks. | Build agent |
+| 0.8 | 2026-10-24 | Booster scale 20× (10× accepted earlier; 20× is the next test). Booster descends slowly, drifts out past the play area and is killed (FR-33, Q-J decided). Probe v0.11.17 adds `SCALES`: a static row of MLRS rockets at 1×–25×. | Build agent |
 
 ---
 

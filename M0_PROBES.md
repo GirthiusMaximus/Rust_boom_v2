@@ -760,3 +760,30 @@ Notes:
 - Operator reports the box buttons were blank (no visible labels), so they used `/probe more` to submit. Rendering is not confirmed.
 - `/probe stop` was typed after the run. It is not a command in the plugin, and the log shows no reply.
 - The 199-character 0001 to 0040 string has still not been tested.
+
+## Run order for plugin v0.11.17 (2026-10-24)
+
+Reload the plugin only when no probe is running and no box is open. A reload records a running probe as MISSING and its observation is lost.
+
+1. Check the banner says **v0.11.17**.
+2. `/probe start`
+3. `/probe boxtest`. The box opens at once. Type 0001 to 0040 (199 characters). Press Submit. Report any cut and send the log.
+4. `/probe scales`. Walk to the row, about 80 m in front. Look at the six MLRS rockets (1×, 5×, 10×, 15×, 20×, 25×). Report which one looks like a realistic ICBM against the terrain and your height. Then `/probe scales end`. The observation is queued; no box opens.
+5. `/probe flight`. Stand where you can see the booster and bus. The run ends by itself when the booster has left the play area and the bus has reached the ground. Watch for: the booster climbing, the bus separating, the booster descending slowly, and it going out of view. Compare its size with the 20× rocket in step 4 from the same distance. If it looks like 1×, scale replication (Q-H) has failed. Do not run `/probe end` after this one. The observation is queued and the probe ends itself.
+6. `/probe flight cam`. Same as step 5. Also note the camera identifier in the log (`CAMERA booster cam ... identifier='NUKE…'`). Check whether a computer station shows the camera feed, and report what you see.
+7. `/probe outstanding`. Submit each observation box in turn: scales, flight, flight cam. Each Submit opens the next.
+8. `/probe end` closes the session.
+
+To stop a running probe at any point: `/probe stop` (same as `/probe abort`).
+
+What the logs will show:
+- **SCALE** lines: each rocket's localScale and lossyScale, and its distance from you.
+- **FLIGHT** lines (every second): booster and bus positions, the booster's scale, and the distance from each online player.
+- **SEPARATION**, **FLOAT-OUT** and **IMPACT** lines: when each event happened and where.
+- **CAMERA** line: the camera's identifier and where it was attached.
+- **ERROR** lines: anything that threw. Send them with the log.
+
+Still unverified (these results decide the next step):
+- Scale replication to clients (Q-H): compare the flight booster with the scaled row.
+- Visibility to all players regardless of location (Q-I): needs a second player at a distance.
+- The box buttons (`isProtected` false): Submit and Add part are to be tested in step 3 and step 7.

@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.16.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.17.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.16")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.17")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.16";
+    private const string Version = "0.11.17";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -77,16 +77,19 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT", "SCALES" };
     private const string MlrsRocketPrefab = "assets/content/vehicles/mlrs/rocket_mlrs.prefab";
-    private const float FlightBoosterScale = 6f;        // booster body scale; replication to clients is unverified
+    private const float FlightBoosterScale = 20f;       // booster body scale (10x was accepted earlier); replication to clients is unverified
     private const float FlightBoostSeconds = 30f;
     private const float FlightApogeeMetres = 300f;
     private const float FlightDownrangeMetres = 600f;
     private const float FlightBusSpeed = 40f;           // m/s forward push at separation
-    private const float FlightBoosterDriftSpeed = 5f;   // m/s forward drift after separation
+    private const float FlightBoosterDriftSpeed = 20f;  // m/s drift away from the launch side after separation
     private const float FlightBoosterDescentRate = 3f;  // m/s slow descent after separation
-    private const float FlightDescentSeconds = 120f;
+    private const float FlightMaxSeconds = 900f;        // safety limit after launch; normal end is the booster leaving the play area
+    private const float FlightMapHalfSize = 3000f;      // 6000 m map, centred on 0 (operator positions fit this; logged)
+    private const float FlightKillMarginMetres = 300f;  // booster is killed this far past the edge
+    private const float FlightImpactBelowLaunch = 20f;  // bus is killed this far below the launch height (impact)
     private const float FlightTipOffset = 4f;           // m above the booster origin where the bus starts
     private const float FlightGravity = 9.81f;
     private const float FlightStepSeconds = 0.25f;
@@ -340,6 +343,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         player.ChatMessage("R7 [radius ...] (default 0.01 0.025 0.05 0.1 0.25)   R7 move [radius] [m/s] (moving marker)");
         player.ChatMessage("R9 [spacing] [static|follow]   R1b (carrier test)   R1c (manifest search)   R1e (child toggle on the warhead bus)   R1f (silo parent test)");
         player.ChatMessage("Flight: /probe flight [cam] runs boost, bus separation and booster descent, logging positions. /probe stop = abort.");
+        player.ChatMessage("Scales: /probe scales spawns a static row of MLRS rockets at 1x to 25x for review.");
         player.ChatMessage("Silo avenues: R1g / R1h need 'go' (effect route, no cleanup)   R1i scene instances   R1j server prefab audit   R1k networked child scan   R1m BaseEntity injection   R1n ClientEntity (killable, moves)   R1o effect parented to a bus (killable)   R1p Harmony discovery (read-only)   R1q Harmony prefab-id swap on one bus (approved, server-side)   R1r prefab id before Spawn, no Harmony   R1s wider Harmony write-path interception   R1t silo prefab via CreateEntity   BOXTEST observation box capture test   R1u final in-situ inspection and every spawn method");
         player.ChatMessage("Also: /probe abort");
     }
@@ -512,6 +516,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "BOXTEST": ProbeBoxTest(run, op); break;
                 case "R1u": ProbeR1u(run, op); break;
                 case "FLIGHT": ProbeFlight(run, op); break;
+                case "SCALES": ProbeScales(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -2018,6 +2023,47 @@ public class TheatricalNukeProbe : CarbonPlugin
         EndProbe(run, "box test: observation box opened for typed text", null, p, true);
     }
 
+    // ── SCALES: static MLRS rockets at several scales, in a row in front of the operator ────────
+    // Nothing moves and nothing is destroyed until cleanup. Use it to pick the booster scale by eye.
+    private static readonly float[] ScaleRowFactors = { 1f, 5f, 10f, 15f, 20f, 25f };
+    private const float ScaleRowSpacingMetres = 40f;
+    private const float ScaleRowDistanceMetres = 80f;
+
+    private void ProbeScales(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 900f;
+        var forward = Vector3.ProjectOnPlane(p.transform.forward, Vector3.up);
+        if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
+        forward.Normalize();
+        var right = Vector3.Cross(Vector3.up, forward);
+        var centre = p.transform.position + forward * ScaleRowDistanceMetres;
+        var count = ScaleRowFactors.Length;
+
+        for (var i = 0; i < count; i++)
+        {
+            var factor = ScaleRowFactors[i];
+            var offset = (i - (count - 1) / 2f) * ScaleRowSpacingMetres;
+            var at = centre + right * offset;
+
+            var rocket = GameManager.server.CreateEntity(MlrsRocketPrefab, at, Quaternion.identity);
+            if (rocket == null)
+            {
+                Line(run, "RESULT", $"row {i + 1}: CreateEntity returned null for rocket_mlrs at {Pos(at)}");
+                continue;
+            }
+
+            rocket.Spawn();
+            Track(run, rocket, $"scale {factor:0}x");
+            rocket.CancelInvoke();
+            rocket.transform.localScale = Vector3.one * factor;
+            rocket.SendNetworkUpdateImmediate();
+            Line(run, "SCALE", $"{factor:0}x at {Pos(at)} localScale={Pos(rocket.transform.localScale)} lossyScale={Pos(rocket.transform.lossyScale)} distance={Dist(at, p):0} m");
+        }
+
+        Line(run, "STEP", $"row of {count} static rockets, {ScaleRowSpacingMetres:0} m apart, {ScaleRowDistanceMetres:0} m in front, facing {Pos(forward)}");
+        Line(run, "RESULT", "Operator: walk to the row and look at each rocket. Report which scale looks like a realistic ICBM against the terrain and your own height.");
+    }
+
     // ── FLIGHT: plugin-calculated boost, bus separation and booster descent ──────────────────────
     // The booster is a vanilla rocket_mlrs scaled up. The bus is nuclear_warhead.prefab. The plugin
     // calculates every position and moves each entity itself. Positions are logged every second.
@@ -2028,7 +2074,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private void ProbeFlight(ProbeRun run, BasePlayer p)
     {
         var withCam = run.Args.Any(a => a.Equals("cam", StringComparison.OrdinalIgnoreCase));
-        run.TimeoutSeconds = FlightBoostSeconds + FlightDescentSeconds + 30f;
+        run.TimeoutSeconds = FlightBoostSeconds + FlightMaxSeconds + 30f;
 
         var forward = Vector3.ProjectOnPlane(p.transform.forward, Vector3.up);
         if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
@@ -2104,17 +2150,36 @@ public class TheatricalNukeProbe : CarbonPlugin
             }
             else
             {
-                // Bus: its own arc under gravity. Booster: slow drift and descent.
+                // Bus: its own arc under gravity; killed at impact height.
                 if (s.Bus != null && !s.Bus.IsDestroyed)
                 {
                     s.BusVelocity += Vector3.down * FlightGravity * FlightStepSeconds;
-                    MoveFlightEntity(s.Bus, s.Bus.transform.position + s.BusVelocity * FlightStepSeconds);
+                    var busNext = s.Bus.transform.position + s.BusVelocity * FlightStepSeconds;
+                    if (busNext.y < s.Launch.y - FlightImpactBelowLaunch)
+                    {
+                        Line(run, "IMPACT", $"t={s.Elapsed:0.0}s bus reached the ground near {Pos(s.Bus.transform.position)}; killed");
+                        s.Bus.Kill();
+                    }
+                    else
+                    {
+                        MoveFlightEntity(s.Bus, busNext);
+                    }
                 }
 
+                // Booster: slow descent while drifting away; killed once it is past the play area.
                 if (boosterAlive)
                 {
                     var drift = s.Forward * FlightBoosterDriftSpeed + Vector3.down * FlightBoosterDescentRate;
-                    MoveFlightEntity(s.Booster, s.Booster.transform.position + drift * FlightStepSeconds);
+                    var boosterNext = s.Booster.transform.position + drift * FlightStepSeconds;
+                    if (OutOfPlay(boosterNext))
+                    {
+                        Line(run, "FLOAT-OUT", $"t={s.Elapsed:0.0}s booster left the play area at {Pos(boosterNext)} (edge {FlightMapHalfSize:0} m, kill margin {FlightKillMarginMetres:0} m); killed");
+                        s.Booster.Kill();
+                    }
+                    else
+                    {
+                        MoveFlightEntity(s.Booster, boosterNext);
+                    }
                 }
             }
         }
@@ -2132,10 +2197,19 @@ public class TheatricalNukeProbe : CarbonPlugin
             LogFlight(run, s);
         }
 
-        if (s.Elapsed >= FlightBoostSeconds + FlightDescentSeconds)
+        var boosterGone = s.Booster == null || s.Booster.IsDestroyed;
+        var busGone = s.Bus == null || s.Bus.IsDestroyed;
+        if (s.Separated && boosterGone && busGone)
         {
             LogFlight(run, s);
-            EndProbe(run, "flight complete", null, op, false);
+            EndProbe(run, "flight complete: booster floated out, bus reached the ground", null, op, false);
+            return;
+        }
+
+        if (s.Elapsed >= FlightBoostSeconds + FlightMaxSeconds)
+        {
+            LogFlight(run, s);
+            EndProbe(run, "flight stopped at the safety time limit", null, op, false);
             return;
         }
 
@@ -2173,6 +2247,9 @@ public class TheatricalNukeProbe : CarbonPlugin
             s.BusCam = SpawnFlightCamera(run, bus, FlightBusCamLocal, Vector3.one, "bus cam", FlightCamEuler);
         }
     }
+
+    private static bool OutOfPlay(Vector3 v) =>
+        Mathf.Abs(v.x) > FlightMapHalfSize + FlightKillMarginMetres || Mathf.Abs(v.z) > FlightMapHalfSize + FlightKillMarginMetres;
 
     private static void MoveFlightEntity(BaseEntity e, Vector3 pos)
     {
