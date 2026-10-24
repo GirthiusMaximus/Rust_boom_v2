@@ -740,3 +740,14 @@ Notes:
 - Sweep gap: `GameManager.Instantiate(string, Vector3, Quaternion)` was not invoked. Fixed in v0.11.15 (`e153df7`); R1u must be re-run to complete the sweep.
 - Box failure (v0.11.14): buttons never reached the plugin; no submit or close entries. Fixed in v0.11.15 (buttons unprotected, keyboard capture removed, `/probe end` reopens a stuck box). Not yet verified in game.
 - Reload during the run: the unload path records the run as MISSING, so the observation is lost. Use `/probe end` rather than reloading.
+
+## R1u, complete run (session 10:10Z, plugin v0.11.15), supersedes the partial entry above
+
+- Sweep now covers all four GameManager (string, Vector3, Quaternion) methods: CreatePrefab x2, CreateEntity, Instantiate.
+- CreatePrefab (x2) and Instantiate returned local GameObjects only (Transform and MeshCollider), destroyed at once. Not networked.
+- CreateEntity returned null.
+- Tracked entities 0, cleanup OK, errors 0. Effect route skipped (client refuses the prefab).
+- In-situ silo missile and server prefab root: MeshCollider only, no MeshFilter or Renderer.
+- **Operator observation (chat, /probe obs): "No missle was seen."** No visible spawn.
+- Box on v0.11.15: X closed the box (buttons respond now). The input field sent text at 10:10:59 (empty) and 10:11:06 ("tt", 2 characters), then the box closed without submitting. Submit not yet tested. The chat fallback `/probe obs` saved the observation.
+- Open: the input field sends its text on end-edit, and it sent after 2 characters. The cause is not yet known. Same family as the 79-character cut.
