@@ -290,6 +290,7 @@ Priorities: **M** must (v1), **S** should (v1 if cheap), **C** could (post-v1), 
 | FR-81 | M | On load, scan for entities owned/tagged by this plugin and remove leftovers (crash/reload recovery). |
 | FR-82 | M | `Unload` kills all strike-owned entities, timers, cameras, UI and subscriptions, each isolated (`Safe.Unload`). |
 | FR-83 | M | Cooldowns persist across reloads (data file), with a version field. |
+| FR-84 | M | **Map size is read at runtime (operator, 2026-10-24).** Rust maps range from 1000 m to 6000 m square. The plugin reads `ConVar.Server.worldsize` on every run and derives every map-relative coordinate from it: play-area half-size = worldsize ÷ 2 (centred on 0, Q-K), the booster downrange distance (20 % of the half-size), the kill margin past the edge (10 %), the edge clearance for launch points and scale rows (100 m), and the marker start (R7). Nothing hard-codes 6000 m. A launch point or spawn row outside the play area is refused before anything spawns, and the reason is logged. Altitudes (apogee, descent) stay in metres. |
 
 ---
 
@@ -466,6 +467,7 @@ compiled).
 | Map-wide effect delivery | `Effect.server.Run(name, pos, normal, connection, broadcast: true)` → `EffectNetwork.Send` → `BaseNetworkable.GlobalNetworkGroup.subscribers` = **every connected client**. **But** a string name must already be in the engine's string pool: an asset path not in the pool logs `unknown effect` and is dropped silently (R6 run 1). `Run` returns nothing, so failure is not detectable in code. | ⚠️ broadcast verified; **siren path failed** (D-2) |
 | Booster as scaled MLRS rocket | `rocket_mlrs.prefab` spawns as a `BaseEntity` on the MIRV path. Scale replication to clients is unverified. | ⚠️ probe FLIGHT (Q-H) |
 | Global visibility of a networked entity | Group 0 is global (`Rust.MD` §5.1). Distance-based visibility for normal entities is not verified in the references. | ⚠️ probe FLIGHT (Q-I) |
+| Map size (worldsize) | `ConVar.Server.worldsize` already read by R7. Centring on 0 is verified only for the 6000 m map. | ⚠️ Q-K |
 | Silo missile body | Client refuses it on both spawn paths (R1 to R1u, `M0_PROBES.md`). | ❌ closed; FR-25 superseded |
 | MLRS MIRVs | `rocket_mlrs.prefab` = `MLRSRocket : TimedExplosive, SamSite.ISamSiteTarget`, has `ServerProjectile`; `ProjectileImpact` explodes and broadcasts ground FX; `ServerInit` creates a map marker and broadcasts launch FX. | ✅ verified |
 | Aiming an MIRV | `ServerProjectile.InitializeVelocity(Vector3)` is public; `speed`, `gravityModifier`, `initialVelocity` are public fields. | ✅ verified |
@@ -655,6 +657,7 @@ Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_P
 | Q-H | Does a server-side scale replicate to clients? | The booster must look like a nuclear missile, not an MLRS rocket. | Open. Probe FLIGHT logs the scale; the operator's view decides. A fallback is needed if it does not replicate. |
 | Q-I | Can a networked booster and bus be seen by all players, regardless of location? | Operator requirement. Visibility for normal entities is per watcher and not verified. | Open. Probe FLIGHT logs the distance to every online player. Needs a second player to test. |
 | Q-J | After separation, does the booster "float out of the map" or make a "slow descent to earth"? | Both were written. | **Decided (operator, 2026-10-24):** both. It descends slowly, drifts far enough outside the play area, then is killed. |
+| Q-K | Is every map centred on 0, from 1000 m to 6000 m? | FR-84 assumes it. Only the 6000 m map has been seen. | Open. Each probe logs the worldsize and half-size. Test on a 1000 m or 2000 m map before M3. |
 
 ### 13.3 Work items created by the answers
 
@@ -712,6 +715,7 @@ amended if reality disagreed.
 | 0.6 | 2026-10-18 | Operator run 7: the initial missile on ascent and boost must use `nuclear_silo_missile.prefab` (FR-25 locked; decision Q-F). Any spawned route must be killable after the test. Probe v0.11.0 adds R1g–R1o: effect routes, scene search, prefab audit, networked child scan, component injection, Carbon `ClientEntity` (killable, moves) and an effect parented to an entity (killable). Body route still open pending run-7 results. | Build agent |
 | 0.7 | 2026-10-24 | Operator: the silo prefab cannot be spawned for a client, so the booster is now a scaled `rocket_mlrs.prefab` (FR-25 superseded, Q-G). Bus spawns at end of boost and is pushed forward (FR-31). Booster drifts and descends instead of being removed (FR-33, Q-J). Booster and bus must reach all players regardless of location (FR-25d, Q-I). Camera is a child of the booster (FR-60). Probe v0.11.16 adds FLIGHT [cam]; box labels, `/probe stop`, and `probes/precheck.py` pre-presentation checks. | Build agent |
 | 0.8 | 2026-10-24 | Booster scale 20× (10× accepted earlier; 20× is the next test). Booster descends slowly, drifts out past the play area and is killed (FR-33, Q-J decided). Probe v0.11.17 adds `SCALES`: a static row of MLRS rockets at 1×–25×. | Build agent |
+| 0.9 | 2026-10-24 | Map size is read at runtime (FR-84). Maps from 1000 m to 6000 m are supported; downrange, kill margin and launch and spawn checks scale with the map. Q-K opened for centring. Probe v0.11.18 uses the server worldsize in FLIGHT and SCALES. | Build agent |
 
 ---
 

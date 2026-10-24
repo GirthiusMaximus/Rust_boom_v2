@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.17.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.18.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.17")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.18")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.17";
+    private const string Version = "0.11.18";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -82,13 +82,13 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const float FlightBoosterScale = 20f;       // booster body scale (10x was accepted earlier); replication to clients is unverified
     private const float FlightBoostSeconds = 30f;
     private const float FlightApogeeMetres = 300f;
-    private const float FlightDownrangeMetres = 600f;
+    private const float FlightDownrangeFraction = 0.2f;  // of the map half-size: 600 m on a 6000 m map
     private const float FlightBusSpeed = 40f;           // m/s forward push at separation
     private const float FlightBoosterDriftSpeed = 20f;  // m/s drift away from the launch side after separation
     private const float FlightBoosterDescentRate = 3f;  // m/s slow descent after separation
     private const float FlightMaxSeconds = 900f;        // safety limit after launch; normal end is the booster leaving the play area
-    private const float FlightMapHalfSize = 3000f;      // 6000 m map, centred on 0 (operator positions fit this; logged)
-    private const float FlightKillMarginMetres = 300f;  // booster is killed this far past the edge
+    private const float FlightKillMarginFraction = 0.1f; // of the map half-size: booster killed 300 m past the edge on a 6000 m map
+    private const float MapEdgeClearanceMetres = 100f;   // launch and scale-row points must be this far inside the edge
     private const float FlightImpactBelowLaunch = 20f;  // bus is killed this far below the launch height (impact)
     private const float FlightTipOffset = 4f;           // m above the booster origin where the bus starts
     private const float FlightGravity = 9.81f;
@@ -2038,6 +2038,19 @@ public class TheatricalNukeProbe : CarbonPlugin
         var right = Vector3.Cross(Vector3.up, forward);
         var centre = p.transform.position + forward * ScaleRowDistanceMetres;
         var count = ScaleRowFactors.Length;
+        var half = MapHalfSize();
+        Line(run, "STEP", $"map worldsize={ConVar.Server.worldsize} m; play-area half-size {half:0} m (centred on 0, assumed)");
+
+        // Check the whole row before spawning anything, so a refusal leaves nothing behind.
+        for (var i = 0; i < count; i++)
+        {
+            var check = centre + right * ((i - (count - 1) / 2f) * ScaleRowSpacingMetres);
+            if (!InsideMap(check, half))
+            {
+                Line(run, "RESULT", $"Rocket {i + 1} would sit at {Pos(check)}, outside the play area (half-size {half:0} m). Move toward the centre and run again. Nothing spawned.");
+                return;
+            }
+        }
 
         for (var i = 0; i < count; i++)
         {
@@ -2080,7 +2093,23 @@ public class TheatricalNukeProbe : CarbonPlugin
         if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
         forward.Normalize();
 
-        var state = new FlightState { Launch = InFront(p, 30f, 0f), Forward = forward, WithCam = withCam };
+        var half = MapHalfSize();
+        var launch = InFront(p, 30f, 0f);
+        if (!InsideMap(launch, half))
+        {
+            Line(run, "RESULT", $"Launch point {Pos(launch)} is outside the play area (half-size {half:0} m). Move toward the centre of the map and run again. Nothing spawned.");
+            return;
+        }
+
+        var state = new FlightState
+        {
+            Launch = launch,
+            Forward = forward,
+            WithCam = withCam,
+            HalfSize = half,
+            DownrangeMetres = half * FlightDownrangeFraction,
+            MarginMetres = half * FlightKillMarginFraction,
+        };
 
         var booster = GameManager.server.CreateEntity(MlrsRocketPrefab, state.Launch, Quaternion.identity);
         if (booster == null)
@@ -2099,7 +2128,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         Line(run, "STEP", $"booster {MlrsRocketPrefab} spawned at {Pos(state.Launch)} scale={FlightBoosterScale:0.0}x (localScale={Pos(booster.transform.localScale)}); CancelInvoke called");
         Line(run, "STEP", $"booster components: {string.Join(", ", booster.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name))}");
-        Line(run, "STEP", $"plan: boost {FlightBoostSeconds:0} s, apogee {FlightApogeeMetres:0} m, downrange {FlightDownrangeMetres:0} m toward {Pos(forward)}; bus at separation, booster descends at {FlightBoosterDescentRate:0.0} m/s");
+        Line(run, "STEP", $"plan: boost {FlightBoostSeconds:0} s, apogee {FlightApogeeMetres:0} m, downrange {state.DownrangeMetres:0} m (map half-size {half:0} m, kill margin {state.MarginMetres:0} m) toward {Pos(forward)}; bus at separation, booster descends at {FlightBoosterDescentRate:0.0} m/s");
 
         if (withCam)
         {
@@ -2122,6 +2151,9 @@ public class TheatricalNukeProbe : CarbonPlugin
         public bool Separated;
         public float Elapsed;
         public float NextLog;
+        public float HalfSize;
+        public float DownrangeMetres;
+        public float MarginMetres;
     }
 
     private void FlightStep(ProbeRun run, BasePlayer op, FlightState s)
@@ -2143,7 +2175,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 // Boost: ease-out climb to apogee over FlightBoostSeconds, with downrange travel.
                 var t = Mathf.Min(s.Elapsed / FlightBoostSeconds, 1f);
                 var height = FlightApogeeMetres * (1f - (1f - t) * (1f - t));
-                var pos = s.Launch + Vector3.up * height + s.Forward * (FlightDownrangeMetres * t);
+                var pos = s.Launch + Vector3.up * height + s.Forward * (s.DownrangeMetres * t);
                 MoveFlightEntity(s.Booster, pos);
 
                 if (s.Elapsed >= FlightBoostSeconds) FlightSeparate(run, op, s);
@@ -2171,9 +2203,9 @@ public class TheatricalNukeProbe : CarbonPlugin
                 {
                     var drift = s.Forward * FlightBoosterDriftSpeed + Vector3.down * FlightBoosterDescentRate;
                     var boosterNext = s.Booster.transform.position + drift * FlightStepSeconds;
-                    if (OutOfPlay(boosterNext))
+                    if (OutOfPlay(boosterNext, s))
                     {
-                        Line(run, "FLOAT-OUT", $"t={s.Elapsed:0.0}s booster left the play area at {Pos(boosterNext)} (edge {FlightMapHalfSize:0} m, kill margin {FlightKillMarginMetres:0} m); killed");
+                        Line(run, "FLOAT-OUT", $"t={s.Elapsed:0.0}s booster left the play area at {Pos(boosterNext)} (edge {s.HalfSize:0} m, kill margin {s.MarginMetres:0} m); killed");
                         s.Booster.Kill();
                     }
                     else
@@ -2248,8 +2280,15 @@ public class TheatricalNukeProbe : CarbonPlugin
         }
     }
 
-    private static bool OutOfPlay(Vector3 v) =>
-        Mathf.Abs(v.x) > FlightMapHalfSize + FlightKillMarginMetres || Mathf.Abs(v.z) > FlightMapHalfSize + FlightKillMarginMetres;
+    // Map half-size from the server's worldsize: a 1000 m map gives 500, a 6000 m map gives 3000.
+    // Assumes the map is centred on 0, as the R7 marker code does. The value is logged on every run.
+    private static float MapHalfSize() => ConVar.Server.worldsize / 2f;
+
+    private static bool InsideMap(Vector3 v, float half) =>
+        Mathf.Abs(v.x) <= half - MapEdgeClearanceMetres && Mathf.Abs(v.z) <= half - MapEdgeClearanceMetres;
+
+    private static bool OutOfPlay(Vector3 v, FlightState s) =>
+        Mathf.Abs(v.x) > s.HalfSize + s.MarginMetres || Mathf.Abs(v.z) > s.HalfSize + s.MarginMetres;
 
     private static void MoveFlightEntity(BaseEntity e, Vector3 pos)
     {

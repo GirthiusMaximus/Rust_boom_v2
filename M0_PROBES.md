@@ -765,7 +765,7 @@ Notes:
 
 Reload the plugin only when no probe is running and no box is open. A reload records a running probe as MISSING and its observation is lost.
 
-1. Check the banner says **v0.11.17**.
+1. Check the banner says **v0.11.18**.
 2. `/probe start`
 3. `/probe boxtest`. The box opens at once. Type 0001 to 0040 (199 characters). Press Submit. Report any cut and send the log.
 4. `/probe scales`. Walk to the row, about 80 m in front. Look at the six MLRS rockets (1×, 5×, 10×, 15×, 20×, 25×). Report which one looks like a realistic ICBM against the terrain and your height. Then `/probe scales end`. The observation is queued; no box opens.
