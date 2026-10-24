@@ -658,6 +658,7 @@ Answers received 2026-10-17 are recorded here; the working answer sheet is `M0_P
 | Q-I | Can a networked booster and bus be seen by all players, regardless of location? | Operator requirement. Visibility for normal entities is per watcher and not verified. | Open. Probe FLIGHT logs the distance to every online player. Needs a second player to test. |
 | Q-J | After separation, does the booster "float out of the map" or make a "slow descent to earth"? | Both were written. | **Decided (operator, 2026-10-24):** both. It descends slowly, drifts far enough outside the play area, then is killed. |
 | Q-K | Is every map centred on 0, from 1000 m to 6000 m? | FR-84 assumes it. Only the 6000 m map has been seen. | Open. Each probe logs the worldsize and half-size. Test on a 1000 m or 2000 m map before M3. |
+| Q-L | How high can the apogee go and still be seen by most clients? | FR-27 asks for a very high apogee that stays within most clients' view distance. The repo has no value for client view distance. | Open. Default 1000 m (FR-27). Test with `/probe flight apogee=<m>` at several heights and record the distance at which the booster disappears. |
 
 ### 13.3 Work items created by the answers
 
@@ -716,6 +717,7 @@ amended if reality disagreed.
 | 0.7 | 2026-10-24 | Operator: the silo prefab cannot be spawned for a client, so the booster is now a scaled `rocket_mlrs.prefab` (FR-25 superseded, Q-G). Bus spawns at end of boost and is pushed forward (FR-31). Booster drifts and descends instead of being removed (FR-33, Q-J). Booster and bus must reach all players regardless of location (FR-25d, Q-I). Camera is a child of the booster (FR-60). Probe v0.11.16 adds FLIGHT [cam]; box labels, `/probe stop`, and `probes/precheck.py` pre-presentation checks. | Build agent |
 | 0.8 | 2026-10-24 | Booster scale 20× (10× accepted earlier; 20× is the next test). Booster descends slowly, drifts out past the play area and is killed (FR-33, Q-J decided). Probe v0.11.17 adds `SCALES`: a static row of MLRS rockets at 1×–25×. | Build agent |
 | 0.9 | 2026-10-24 | Map size is read at runtime (FR-84). Maps from 1000 m to 6000 m are supported; downrange, kill margin and launch and spawn checks scale with the map. Q-K opened for centring. Probe v0.11.18 uses the server worldsize in FLIGHT and SCALES. | Build agent |
+| 0.10 | 2026-10-24 | Apogee default 1000 m (FR-27). Operator wants a very high apogee that stays within most clients' view distance (Q-L, open). Probe v0.11.19 accepts `apogee=<metres>` (50 to 3000) on FLIGHT. | Build agent |
 
 ---
 

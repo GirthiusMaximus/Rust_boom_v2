@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.18.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.19.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.18")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.19")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.18";
+    private const string Version = "0.11.19";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -81,7 +81,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const string MlrsRocketPrefab = "assets/content/vehicles/mlrs/rocket_mlrs.prefab";
     private const float FlightBoosterScale = 20f;       // booster body scale (10x was accepted earlier); replication to clients is unverified
     private const float FlightBoostSeconds = 30f;
-    private const float FlightApogeeMetres = 300f;
+    private const float FlightApogeeDefaultMetres = 1000f;  // FR-27 default; override with apogee=<metres>, 50 to 3000
     private const float FlightDownrangeFraction = 0.2f;  // of the map half-size: 600 m on a 6000 m map
     private const float FlightBusSpeed = 40f;           // m/s forward push at separation
     private const float FlightBoosterDriftSpeed = 20f;  // m/s drift away from the launch side after separation
@@ -2093,6 +2093,19 @@ public class TheatricalNukeProbe : CarbonPlugin
         if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
         forward.Normalize();
 
+        var apogee = FlightApogeeDefaultMetres;
+        foreach (var arg in run.Args)
+        {
+            if (!arg.StartsWith("apogee=", StringComparison.OrdinalIgnoreCase)) continue;
+            float parsed;
+            if (!float.TryParse(arg.Substring(7), out parsed) || parsed < 50f || parsed > 3000f)
+            {
+                Line(run, "RESULT", $"Refused: '{arg}'. The apogee must be a number of metres from 50 to 3000, for example apogee=1000. Nothing spawned.");
+                return;
+            }
+            apogee = parsed;
+        }
+
         var half = MapHalfSize();
         var launch = InFront(p, 30f, 0f);
         if (!InsideMap(launch, half))
@@ -2106,6 +2119,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             Launch = launch,
             Forward = forward,
             WithCam = withCam,
+            ApogeeMetres = apogee,
             HalfSize = half,
             DownrangeMetres = half * FlightDownrangeFraction,
             MarginMetres = half * FlightKillMarginFraction,
@@ -2128,7 +2142,7 @@ public class TheatricalNukeProbe : CarbonPlugin
 
         Line(run, "STEP", $"booster {MlrsRocketPrefab} spawned at {Pos(state.Launch)} scale={FlightBoosterScale:0.0}x (localScale={Pos(booster.transform.localScale)}); CancelInvoke called");
         Line(run, "STEP", $"booster components: {string.Join(", ", booster.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name))}");
-        Line(run, "STEP", $"plan: boost {FlightBoostSeconds:0} s, apogee {FlightApogeeMetres:0} m, downrange {state.DownrangeMetres:0} m (map half-size {half:0} m, kill margin {state.MarginMetres:0} m) toward {Pos(forward)}; bus at separation, booster descends at {FlightBoosterDescentRate:0.0} m/s");
+        Line(run, "STEP", $"plan: boost {FlightBoostSeconds:0} s, apogee {state.ApogeeMetres:0} m, downrange {state.DownrangeMetres:0} m (map half-size {half:0} m, kill margin {state.MarginMetres:0} m) toward {Pos(forward)}; bus at separation, booster descends at {FlightBoosterDescentRate:0.0} m/s");
 
         if (withCam)
         {
@@ -2152,6 +2166,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         public float Elapsed;
         public float NextLog;
         public float HalfSize;
+        public float ApogeeMetres;
         public float DownrangeMetres;
         public float MarginMetres;
     }
@@ -2174,7 +2189,7 @@ public class TheatricalNukeProbe : CarbonPlugin
             {
                 // Boost: ease-out climb to apogee over FlightBoostSeconds, with downrange travel.
                 var t = Mathf.Min(s.Elapsed / FlightBoostSeconds, 1f);
-                var height = FlightApogeeMetres * (1f - (1f - t) * (1f - t));
+                var height = s.ApogeeMetres * (1f - (1f - t) * (1f - t));
                 var pos = s.Launch + Vector3.up * height + s.Forward * (s.DownrangeMetres * t);
                 MoveFlightEntity(s.Booster, pos);
 

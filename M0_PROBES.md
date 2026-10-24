@@ -787,3 +787,37 @@ Still unverified (these results decide the next step):
 - Scale replication to clients (Q-H): compare the flight booster with the scaled row.
 - Visibility to all players regardless of location (Q-I): needs a second player at a distance.
 - The box buttons (`isProtected` false): Submit and Add part are to be tested in step 3 and step 7.
+
+
+## Exact probe list, plugin v0.11.19 (2026-10-24)
+
+Reload only when no probe is running and no box is open. Check the banner says **v0.11.19**.
+
+### A. 6000 m map (loaded now)
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. | Banner. |
+| 2 | `/probe boxtest` | Box opens at once. Type 0001 to 0040 (199 characters), then Submit. | Any cut. Submit and Add part work. |
+| 3 | `/probe scales` | Walk to the row, about 80 m in front. Then `/probe scales end`. | Which of 1x, 5x, 10x, 15x, 20x, 25x looks like a realistic ICBM. |
+| 4 | `/probe flight apogee=1000` | Run ends itself. | Climb, separation, slow descent, booster leaves the play area, bus lands. From what distance does the booster disappear? |
+| 5 | `/probe flight cam apogee=1000` | Run ends itself. | As step 4. Note the camera identifier in the log. Check a computer station for the feed. |
+| 6 | `/probe flight apogee=600` | Run ends itself. | As step 4, lower apogee. Record the disappearance distance. |
+| 7 | `/probe flight apogee=2000` | Run ends itself. | As step 4, higher apogee. Record the disappearance distance. |
+| 8 | `/probe outstanding` | Submit each box in turn (scales, flights, camera flight). | Each observation is saved. |
+| 9 | `/probe end` | Closes the session. | Summary. |
+
+### B. Smaller map (load it, then repeat)
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | Load the smaller map. Reload the plugin. Check the banner says v0.11.19. | | |
+| 2 | `/probe start` | | Banner shows the new map size (`worldsize`). |
+| 3 | `/probe scales` | If the row is refused as outside the play area, walk toward the centre and run it again. Then `/probe scales end`. | Same 1x to 25x row. Is the row inside the map? |
+| 4 | `/probe flight apogee=1000` | Run ends itself. | Log shows the half-size (worldsize / 2) and the kill margin. The booster should leave the play area sooner than on 6000 m. |
+| 5 | `/probe flight cam apogee=1000` | Run ends itself. | As step 4. |
+| 6 | `/probe outstanding`, then `/probe end` | Submit each box. | |
+
+Centring check (Q-K): in the log, your position should lie between -half and +half on both axes. If you stand near a map corner and your coordinates fall outside that range, the map is not centred on 0. Send the log.
+
+Commands that can be used at any time: `/probe stop` (aborts the running probe).
