@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.22.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.23.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.22")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.23")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.22";
+    private const string Version = "0.11.23";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -2369,8 +2369,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 cam.SetParent(bus, worldPositionStays: false);
                 cam.transform.localPosition = FlightBusCamLocal;
                 cam.transform.localRotation = Quaternion.Euler(FlightCamEuler);
-                cam.transform.localScale = Vector3.one;
-                cam.SendNetworkUpdateImmediate();
+                SetReplicatedScale(run, cam, Vector3.one, "booster cam at bus");
                 s.BusCam = cam;
                 Line(run, "CAMERA", $"booster cam moved to the bus (same identifier '{CamIdentifier(cam)}'); localPos={Pos(FlightBusCamLocal)}");
                 op.ChatMessage($"CCTV identifier {CamIdentifier(cam)} is now on the bus.");
@@ -2437,14 +2436,25 @@ public class TheatricalNukeProbe : CarbonPlugin
         Line(run, "STEP", $"{label}: Rigidbody set kinematic (isKinematic={body.isKinematic}, useGravity={body.useGravity})");
     }
 
-    // Scale only reaches clients when networkEntityScale is true (Carbon, October 2025 update: "The scale only gets networked
-    // if the BaseEntity.networkEntityScale is set to true"). Without it the 1x to 25x rockets looked the same (session 154435).
+    // Scale reaches a client only when the client creates the entity. Setting networkEntityScale and sending an update
+    // was not enough (session 070506: all six rockets still looked the same). Carbon's HammerModule.ReconstructEntity
+    // (CarbonCommunity/Carbon, src/.../HammerModule.cs) does: networkEntityScale = true, DestroyOnClient for each subscriber,
+    // then SendNetworkUpdateImmediate. The probe copies that sequence.
     private void SetReplicatedScale(ProbeRun run, BaseEntity e, Vector3 scale, string label)
     {
         e.transform.localScale = scale;
         e.networkEntityScale = true;
+        var subscribers = 0;
+        if (e.net != null && e.net.group != null)
+        {
+            subscribers = e.net.group.subscribers.Count;
+            for (int i = 0; i < e.net.group.subscribers.Count; i++)
+            {
+                e.DestroyOnClient(e.net.group.subscribers[i]);
+            }
+        }
         e.SendNetworkUpdateImmediate();
-        Line(run, "STEP", $"{label}: scale {Pos(scale)} sent with networkEntityScale=true (localScale now {Pos(e.transform.localScale)})");
+        Line(run, "STEP", $"{label}: scale {Pos(scale)}; networkEntityScale=true; client copies destroyed and resent ({subscribers} subscriber(s)); localScale now {Pos(e.transform.localScale)}");
     }
 
     private BaseEntity SpawnFlightPlume(ProbeRun run, BaseEntity booster)
@@ -2465,6 +2475,11 @@ public class TheatricalNukeProbe : CarbonPlugin
         fire.lifeTimeMax = 600f;
         fire.Spawn();
         Track(run, fire, "booster plume");
+        // FireBall moves and spreads by itself (session 070506: the plume fell behind the booster). Cancel its scheduled
+        // calls and stop its rigidbody so the parent offset holds.
+        fire.CancelInvoke();
+        DisableBodyPhysics(run, fire, "plume");
+        Line(run, "PLUME", $"plume components: {string.Join(", ", fire.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name))}; CancelInvoke called");
         fire.SetParent(booster, worldPositionStays: false);
         fire.transform.localPosition = FlightPlumeLocal;
         fire.transform.localRotation = Quaternion.identity;
@@ -2515,8 +2530,7 @@ public class TheatricalNukeProbe : CarbonPlugin
         cctv.SetParent(parent, worldPositionStays: false);
         cctv.transform.localPosition = localPos;
         cctv.transform.localRotation = Quaternion.Euler(localEuler);
-        cctv.transform.localScale = childScale;
-        cctv.SendNetworkUpdateImmediate();
+        SetReplicatedScale(run, cctv, childScale, $"{label} child scale");
 
         var parentId = parent.net != null ? parent.net.ID.ToString() : "none";
         Line(run, "CAMERA", $"{label}: parent net={parentId} localPos={Pos(localPos)} world={Pos(cctv.transform.position)} identifier='{CamIdentifier(cctv)}'");

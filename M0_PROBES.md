@@ -889,3 +889,27 @@ Check the banner says **v0.11.22**. Reload only when no probe is running and no 
 
 ### B. Smaller map (load it, reload the plugin, then repeat steps 2, 3, 6 and 7)
 
+---
+
+## Session 070506 results (plugin v0.11.22, 2026-10-27, 6000 m map)
+
+| Run | Finding | Operator |
+|---|---|---|
+| `/probe scales` | Server reports 1x to 25x correctly, rockets stay where spawned (no fall). The client still shows all six the same size. | "All spawned missiles were the same size." |
+| `/probe flight apogee=1000` | Bus rose to 1048.5 m (target 1050 m) and turned after the apogee. Plume drifted: at 15 s it was about 150 m low and behind. | "Plume starts in front of missile however as missile speeds up it falls behind." |
+| Same run | The bus was not visible from the operator's position. | "bus wasn't visible and falls too quickly per ddraw markers." |
+| `/probe flight straight apogee=1000` | Same climb and bus apogee as above. Booster and plume reach the ground level. | As above. |
+
+Diagnosis, not yet confirmed: client copies keep the scale they were created with (Carbon `HammerModule.ReconstructEntity`). FireBall moves itself, which explains the plume drift.
+
+## Exact probe list, plugin v0.11.23 (2026-10-27)
+
+Check the banner says **v0.11.23**. Reload only when no probe is running and no box is open.
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. | Banner. |
+| 2 | `/probe scales` | Walk to the row. Then `/probe scales end`. | Do the six sizes now differ on the client? |
+| 3 | `/probe flight apogee=1000` | Stand still. Run ends itself. | Plume at the tail, holding its position. Booster size on the client. |
+| 4 | `/probe outstanding` then `/probe end` | Submit each box, then close. | |
+
