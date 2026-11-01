@@ -913,3 +913,38 @@ Check the banner says **v0.11.23**. Reload only when no probe is running and no 
 | 3 | `/probe flight apogee=1000` | Stand still. Run ends itself. | Plume at the tail, holding its position. Booster size on the client. |
 | 4 | `/probe outstanding` then `/probe end` | Submit each box, then close. | |
 
+---
+
+## Custom Entities route (2026-10-27)
+
+Sources: `https://github.com/Nikedemos/Custom-Entities` (`CustomEntities.cs`, `CustomEntitiesExample.cs`, `README.md`, MIT). Carbon `HammerModule` also cited for the client reset.
+
+**What the framework does.** It clones a vanilla prefab on the server under a custom name, registers that name (GameManifest, StringPool, preProcessed), and on save-for-network sends `ClientsidePrefabID` instead. `ClientsidePrefabID` must be a name the client already builds as an entity. The framework therefore changes what the client is told, not what the client can build.
+
+**What that means for the silo.**
+- The silo root has `Transform` and `MeshCollider`, no `BaseEntity` (R1). `CreateEntity` returns null.
+- The client logged `CreateEntity called on a prefab that isn't an entity!` and `Couldn't create network entity!` for the silo name (R1s, 16:40:11).
+- Carbon `ClientEntity` with the silo name gave a prefab ID but no body (R1n).
+- `debug.lookingat` shows the in-situ silo missile as `Ent: -` (a monument prop, not an entity) (R1u).
+
+So the framework cannot show the silo. It can only show a vanilla entity prefab, which the probes already show looks like what it is (the rocket or the bus). Custom server-side names do not add a visual.
+
+| Probe | What it does | Expected | Pass or fail |
+|---|---|---|---|
+| **CE0** | Read-only audit: is the silo a preProcessed entity, is it in the client manifest entity list, its root components and `activeSelf`. Lists every preProcessed name containing nuclear, silo, missile, warhead, icbm, nuke, with entity and manifest flags. | Silo: not an entity, not in manifest. | Read the verdict line. |
+| **CE1** | Framework network-only swap on a `rocket_mlrs` carrier (server name kept, client told the argument's name, default the silo). Client copies destroyed and resent. Killable. | Silo: nothing or a rocket. A `CreateEntity`/`isn't an entity` error would confirm. | Operator looks 8 m in front at 2 m. |
+
+### Probe list, plugin v0.11.24 (2026-10-27)
+
+Check the banner says **v0.11.24**. Reload only when no probe is running and no box is open.
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. | Banner. |
+| 2 | `/probe CE0` | Read only. Run ends itself. | The verdict line. Note any CANDIDATE with entity=True and inManifest=True. |
+| 3 | `/probe CE1` | Stand still. Look 8 m in front at about 2 m. Then `/probe CE1 end` or `/probe end`. | What is visible where the carrier was. Errors in the client console (`isn't an entity`, `Couldn't create network entity`). |
+| 4 | If CE0 lists a missile-like entity prefab: `/probe CE1 <its path>` | As step 3. | Same question. |
+| 5 | `/probe outstanding` then `/probe end` | Submit each box, then close. | |
+
+Install of the framework itself is not needed for these probes. The probes copy the framework's network step only.
+

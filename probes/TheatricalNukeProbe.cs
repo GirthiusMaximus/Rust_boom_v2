@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.23.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.24.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.23")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.24")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.23";
+    private const string Version = "0.11.24";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -77,7 +77,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT", "SCALES" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT", "SCALES", "CE0", "CE1" };
     private const string MlrsRocketPrefab = "assets/content/vehicles/mlrs/rocket_mlrs.prefab";
     private const float FlightBoosterScale = 20f;       // booster body scale (10x was accepted earlier); replication to clients is unverified
     private const float FlightBoostSeconds = 30f;
@@ -523,6 +523,8 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "R1u": ProbeR1u(run, op); break;
                 case "FLIGHT": ProbeFlight(run, op); break;
                 case "SCALES": ProbeScales(run, op); break;
+                case "CE0": ProbeCe0(run, op); break;
+                case "CE1": ProbeCe1(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -3367,6 +3369,139 @@ public class TheatricalNukeProbe : CarbonPlugin
         e.Spawn();
         Track(run, e, "bus");
         Line(run, "RESULT", $"spawned {e.GetType().Name} 8 m in front. Report whether it is visible.");
+    }
+
+    // ── Custom Entities route (Nikedemos/Custom-Entities, MIT) ─────────────────────────────────────
+    // The framework clones a vanilla prefab on the server under a custom name. On the network it swaps the
+    // prefab ID for ClientsidePrefabID, which must be a vanilla name the client already builds as an entity
+    // (CustomEntities.cs, CustomHandler.Save: info.msg.baseNetworkable.prefabID = ClientsidePrefabID).
+    // So the framework cannot show a prefab the client refuses as an entity. CE0 checks that precondition live.
+    // CE1 repeats the framework's network-only swap (BaseEntity.Save, forDisk false) on a killable carrier.
+
+    // CE0: read-only. Is the silo a server entity prefab, and is it in the client's manifest entity list?
+    private void ProbeCe0(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        var silo = MissilePrefab;
+        var pre = GameManager.server.preProcessed.prefabList;
+        var manifest = GameManifest.Current != null && GameManifest.Current.entities != null ? GameManifest.Current.entities : new string[0];
+        var inPre = pre.ContainsKey(silo);
+        var inManifest = manifest.Contains(silo);
+        var sid = StringPool.Get(silo);
+        Line(run, "STEP", $"silo '{silo}': preProcessed={inPre} manifestEntities={inManifest} stringPoolId={sid}");
+
+        var rootIsEntity = false;
+        if (inPre)
+        {
+            var go = pre[silo];
+            rootIsEntity = go.GetComponent<BaseEntity>() != null;
+            var comps = string.Join(", ", go.GetComponents<Component>().Where(c => c != null).Select(c => c.GetType().Name).Distinct());
+            Line(run, "STEP", $"silo root activeSelf={go.activeSelf} hasBaseEntity={rootIsEntity} hasBaseNetworkable={go.GetComponent<BaseNetworkable>() != null} children={go.transform.childCount}; components: {comps}");
+        }
+
+        var keywords = new[] { "nuclear", "silo", "missile", "warhead", "icbm", "nuke" };
+        var hits = pre.Keys.Where(k => keywords.Any(w => k.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0)).OrderBy(k => k).ToList();
+        Line(run, "STEP", $"preProcessed names matching {string.Join("/", keywords)}: {hits.Count}");
+        foreach (var k in hits.Take(60))
+        {
+            var go = pre[k];
+            var isEntity = go.GetComponent<BaseEntity>() != null;
+            Line(run, "CANDIDATE", $"{k} | entity={isEntity} activeSelf={go.activeSelf} inManifest={manifest.Contains(k)} id={StringPool.Get(k)}");
+        }
+
+        var verdict = !inPre || !rootIsEntity || !inManifest
+            ? "The silo is not a client entity prefab. Custom Entities cannot network it: the client would refuse the name."
+            : "The silo is a client entity prefab. Run CE1 to test the network swap.";
+        Line(run, "RESULT", $"{verdict} Candidates above that are entity=True and inManifest=True can be tried with /probe CE1 <prefab path>.");
+        run.Outcome = "CE0 audit";
+    }
+
+    // CE1: the framework's network-only swap. A rocket_mlrs carrier keeps its own server prefab; clients get the
+    // name given as the argument (default: the silo). Clients destroy and recreate their copy, as in SetReplicatedScale.
+    private static BaseEntity _ce1Target;
+    private static uint _ce1ClientId;
+    private static int _ce1Swaps;
+    private const string CeHarmonyId = HarmonyId + ".ce1";
+    private Harmony _ce1Harmony;
+
+    private void ProbeCe1(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 180f;
+        if (_ce1Target != null)
+        {
+            Line(run, "RESULT", "CE1 is already armed. Run /probe end to clean up first. Nothing spawned.");
+            return;
+        }
+
+        var clientName = run.Args.Length > 0 ? run.Args[0] : MissilePrefab;
+        var clientId = StringPool.Get(clientName);
+        if (clientId == 0)
+        {
+            Line(run, "RESULT", $"StringPool has no ID for '{clientName}'. The client cannot receive it. Not run.");
+            return;
+        }
+
+        var target = typeof(BaseEntity).GetMethod(nameof(BaseEntity.Save), new[] { typeof(BaseNetworkable.SaveInfo) });
+        if (target == null)
+        {
+            Line(run, "RESULT", "BaseEntity.Save(SaveInfo) not found. Not run.");
+            return;
+        }
+
+        var front = InFront(p, 8f, 0f);
+        var at = new Vector3(front.x, GroundHeightAt(front, p.transform.position.y) + FlightSpawnClearance, front.z);
+        var carrier = GameManager.server.CreateEntity(MlrsRocketPrefab, at, Quaternion.identity);
+        if (carrier == null)
+        {
+            Line(run, "RESULT", "CreateEntity returned null for the carrier. Not run.");
+            return;
+        }
+
+        carrier.Spawn();
+        Track(run, carrier, "ce1 carrier");
+        carrier.CancelInvoke();
+        DisableRocketMotion(run, carrier);
+        Line(run, "STEP", $"carrier {MlrsRocketPrefab} server prefabID={carrier.prefabID} at {Pos(at)}");
+
+        _ce1Target = carrier;
+        _ce1ClientId = clientId;
+        _ce1Swaps = 0;
+        _ce1Harmony = new Harmony(CeHarmonyId);
+        _ce1Harmony.Patch(target, postfix: R1Hm(nameof(Ce1SavePostfix)));
+        Line(run, "STEP", $"network-only swap armed: clients will be told '{clientName}' (id {clientId}); server name unchanged");
+
+        var subscribers = 0;
+        if (carrier.net != null && carrier.net.group != null)
+        {
+            subscribers = carrier.net.group.subscribers.Count;
+            for (int i = 0; i < carrier.net.group.subscribers.Count; i++)
+            {
+                carrier.DestroyOnClient(carrier.net.group.subscribers[i]);
+            }
+        }
+        carrier.SendNetworkUpdateImmediate();
+        Line(run, "STEP", $"client copies destroyed and resent ({subscribers} subscriber(s)); swaps so far={_ce1Swaps}");
+
+        run.Cleanup.Add(new CleanupItem
+        {
+            Label = "CE1 unpatch",
+            Run = () =>
+            {
+                _ce1Target = null;
+                try { _ce1Harmony?.UnpatchAll(CeHarmonyId); } catch (Exception) { }
+                return $"unpatched; network swaps={_ce1Swaps}";
+            },
+        });
+
+        Line(run, "RESULT", $"Operator: look 8 m in front at about 2 m. Report what appears where the carrier rocket was: upright silo missile, a rocket, nothing, or a shape you cannot name. Carrier is killed at cleanup.");
+    }
+
+    private static void Ce1SavePostfix(BaseEntity __instance, BaseNetworkable.SaveInfo info)
+    {
+        if (_ce1Target == null || __instance != _ce1Target || info.forDisk) return;
+        if (info.msg == null || info.msg.baseNetworkable == null) return;
+        info.msg.baseNetworkable.prefabID = _ce1ClientId;
+        _ce1Swaps++;
     }
 
     // ── R9: FireBall plumes ──────────────────────────────────────────────────────────────────────
