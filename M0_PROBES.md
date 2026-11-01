@@ -948,3 +948,15 @@ Check the banner says **v0.11.24**. Reload only when no probe is running and no 
 
 Install of the framework itself is not needed for these probes. The probes copy the framework's network step only.
 
+
+## Karuza research and CE2 probe (plugin v0.11.25, 2026-11-01)
+
+Background and sources are in `RESEARCH_KARUZA.MD`. CE2 is read-only.
+
+| Step | Command | What to do | What to record |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. Run on a server **without** the Karuza plugin. | Banner. |
+| 2 | `/probe CE2` | Read only. Run ends itself. | The STEP lines for each prefix, and the RESULT line. |
+| 3 | `/probe end` | Closes the session. | |
+
+Interpretation is in `RESEARCH_KARUZA.MD` section 5.

@@ -266,7 +266,7 @@ def selftest():
     faults = {
         "CS0104 whole Carbon.Components import": ("using CUI = Carbon.Components.CUI;", "using Carbon.Components;"),
         "version drift": ('Version = "', 'Version = "0.0.1" + "'),
-        "probe missing from KnownIds": ('"FLIGHT", "SCALES", "CE0", "CE1" }', '"SCALES", "CE0", "CE1" }'),
+        "probe missing from KnownIds": ('"FLIGHT", "SCALES", "CE0", "CE1", "CE2" }', '"SCALES", "CE0", "CE1", "CE2" }'),
         "CS0173 NetworkableId vs uint": ('var parentId = parent.net != null ? parent.net.ID.ToString() : "none";',
                                          "var parentId = parent.net != null ? parent.net.ID : 0u;"),
         "CS0128 duplicate local": ("        var half = MapHalfSize();\n        var launchOnGround = InFront(p, 30f, 0f);",

@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.24.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.25.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.24")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.25")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.24";
+    private const string Version = "0.11.25";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -77,7 +77,7 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const int MaxObservationChars = 6000;
     private const float TickSeconds = 5f;
 
-    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT", "SCALES", "CE0", "CE1" };
+    private static readonly string[] KnownIds = { "R0", "R1", "R2", "R3", "R4", "R5", "R6", "R6b", "R6c", "R7", "R8", "R9", "R10", "R1b", "R1c", "R1e", "R1f", "R1g", "R1h", "R1i", "R1j", "R1k", "R1m", "R1n", "R1o", "R1p", "R1q", "R1r", "R1s", "R1t", "BOXTEST", "R1u", "FLIGHT", "SCALES", "CE0", "CE1", "CE2" };
     private const string MlrsRocketPrefab = "assets/content/vehicles/mlrs/rocket_mlrs.prefab";
     private const float FlightBoosterScale = 20f;       // booster body scale (10x was accepted earlier); replication to clients is unverified
     private const float FlightBoostSeconds = 30f;
@@ -525,6 +525,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 case "SCALES": ProbeScales(run, op); break;
                 case "CE0": ProbeCe0(run, op); break;
                 case "CE1": ProbeCe1(run, op); break;
+                case "CE2": ProbeCe2(run, op); break;
                 case "R1o": ProbeR1o(run, op); break;
                 case "R1h": ProbeR1h(run, op); break;
                 case "R1i": ProbeR1i(run, op); break;
@@ -3502,6 +3503,37 @@ public class TheatricalNukeProbe : CarbonPlugin
         if (info.msg == null || info.msg.baseNetworkable == null) return;
         info.msg.baseNetworkable.prefabID = _ce1ClientId;
         _ce1Swaps++;
+    }
+
+    // CE2: read-only. Does the server's game manifest already list assets/custom/ prefabs, before any plugin registers any?
+    // Karuza's author says the vehicles are registered in the manifest and spawn from assets/custom/*.prefab, and
+    // vehicles appear on vanilla clients. If the shipped manifest has no assets/custom/ names, the client gets those
+    // assets some other way (not yet known). Run this on a server WITHOUT the Karuza plugin loaded.
+    private void ProbeCe2(ProbeRun run, BasePlayer p)
+    {
+        run.TimeoutSeconds = 60f;
+        var names = GameManifest.pathToGuid.Keys.ToList();
+        var entities = GameManifest.Current != null && GameManifest.Current.entities != null ? GameManifest.Current.entities : new string[0];
+        Line(run, "STEP", $"manifest path entries={names.Count}; manifest entity list={entities.Length}");
+
+        var prefixes = new[] { "assets/custom/", "assets/bundled/prefabs/modding/", "assets/content/vehicles/", "assets/prefabs/vehicle/" };
+        foreach (var prefix in prefixes)
+        {
+            var matches = names.Where(n => n.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToList();
+            var entityMatches = entities.Count(e => e.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+            Line(run, "STEP", $"prefix '{prefix}': path entries={matches.Count}; entity-list entries={entityMatches}; sample: {string.Join(", ", matches.Take(5))}");
+        }
+
+        var custom = names.Where(n => n.StartsWith("assets/custom/", StringComparison.OrdinalIgnoreCase)).ToList();
+        if (custom.Count == 0)
+        {
+            Line(run, "RESULT", "No assets/custom/ names in the shipped manifest on this server. Any assets/custom/ prefab a plugin registers must reach the client another way (unresolved; see RESEARCH_KARUZA.MD).");
+        }
+        else
+        {
+            Line(run, "RESULT", $"The manifest already lists {custom.Count} assets/custom/ names before any plugin ran. Check whether this server has a plugin that registered them, and check the client for them.");
+        }
+        run.Outcome = "CE2 manifest scan";
     }
 
     // ── R9: FireBall plumes ──────────────────────────────────────────────────────────────────────
