@@ -960,3 +960,18 @@ Background and sources are in `RESEARCH_KARUZA.MD`. CE2 is read-only.
 | 3 | `/probe end` | Closes the session. | |
 
 Interpretation is in `RESEARCH_KARUZA.MD` section 5.
+
+## Bus descent and smoothness, plugin v0.11.26 (2026-11-01)
+
+Operator decisions: the bus descends at a fixed 3 m/s after apogee, like the booster, and its flight must be smooth with no teleports.
+
+Check the banner says **v0.11.26**. Reload only when no probe is running and no box is open.
+
+| # | Command | What to do | Observe |
+|---|---|---|---|
+| 1 | `/probe start` | Opens the session. | Banner. |
+| 2 | `/probe flight apogee=1000` | Stand still. The run ends itself after the bus lands or leaves the play area. | The `TIMING` lines: steps per second and the longest step. A longest step well above 0.25 s means a stall. Does the bus move in even steps? Does it go over the apogee and then fall at 3 m/s (the `FLIGHT` lines, `bus=` Y falling 3 m/s after the apogee)? Is there any jump in the bus's position? |
+| 3 | `/probe flight cam apogee=1000` | As step 2, with the camera. | The CCTV ID in chat. Does the camera stay with the bus and stay steady? |
+| 4 | `/probe end` | Closes the session. | |
+
+Send the `FLIGHT`, `APOGEE`, `TIMING` and `IMPACT` / `FLOAT-OUT` lines from the probe log.

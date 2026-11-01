@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.25.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.26.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.25")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.26")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.25";
+    private const string Version = "0.11.26";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -93,7 +93,9 @@ public class TheatricalNukeProbe : CarbonPlugin
     private const float FlightTipOffset = 4f;           // m above the booster origin where the bus starts
     private const float FlightGravity = 9.81f;
     private const float FlightBusApogeeFactor = 1.05f;  // bus climbs to 105% of the boost apogee after separation
-    private const float FlightBusRotateSeconds = 5f;    // bus turns slowly to the direction of travel after its apogee
+    private const float FlightBusRotateSeconds = 5f;    // bus turns slowly to the direction of travel after its apogee; its speeds also ease over this time
+    private const float FlightBusDescentRate = FlightBoosterDescentRate;  // m/s; the bus descends at the same fixed rate as the booster
+    private const float FlightMaxStepSeconds = 0.25f;   // a late timer tick never moves the flight more than this in one step
     private static readonly Vector3 FlightPlumeLocal = new Vector3(0f, 0f, -0.5f);  // booster-local: tail end (nose assumed +Z); 0.5 x 20 = 10 m on the server
     private const float FlightStepSeconds = 0.1f;   // 10 position updates a second; the 0.25 s step looked jerky on the bus
     private const float FlightLogSeconds = 1f;
@@ -2196,6 +2198,10 @@ public class TheatricalNukeProbe : CarbonPlugin
         public Vector3 Launch;
         public Vector3 Forward;
         public Vector3 BusVelocity;
+        public Vector3 BusApogeeHorizontal;
+        public float LastRealTime = -1f;
+        public float MaxDt;
+        public int StepsAtLog;
         public Vector3 BurnoutDirection;
         public float GroundY;
         public bool WithCam;
@@ -2214,7 +2220,12 @@ public class TheatricalNukeProbe : CarbonPlugin
     {
         if (run.Ended) return;
 
-        s.Elapsed += FlightStepSeconds;
+        // Time advances by the real time since the last step, capped, so a late timer tick does not slow the flight or bunch positions.
+        var now = Time.realtimeSinceStartup;
+        var dt = s.LastRealTime < 0f ? FlightStepSeconds : Mathf.Clamp(now - s.LastRealTime, 0f, FlightMaxStepSeconds);
+        s.LastRealTime = now;
+        s.MaxDt = Mathf.Max(s.MaxDt, dt);
+        s.Elapsed += dt;
         s.Steps++;
         try
         {
@@ -2239,28 +2250,41 @@ public class TheatricalNukeProbe : CarbonPlugin
             }
             else
             {
-                // Bus: its own arc under gravity; killed at impact height.
+                // Bus: climbs under gravity to its apogee, then eases into the same fixed descent as the booster.
+                // Horizontal speed eases from the separation push to the booster drift while it turns to the direction of travel.
                 if (s.Bus != null && !s.Bus.IsDestroyed)
                 {
-                    s.BusVelocity += Vector3.down * FlightGravity * FlightStepSeconds;
-                    var busNext = s.Bus.transform.position + s.BusVelocity * FlightStepSeconds;
-                    if (s.BusApogeeAt < 0f && s.BusVelocity.y <= 0f)
+                    var busPos = s.Bus.transform.position;
+                    if (s.BusApogeeAt < 0f)
                     {
-                        s.BusApogeeAt = s.Elapsed;
-                        s.BusRotateFrom = s.Bus.transform.rotation;
-                        Line(run, "APOGEE", $"t={s.Elapsed:0.0}s bus apogee {busNext.y - s.Launch.y:0.0} m above the launch point (target {s.BusTargetY - s.Launch.y:0.0} m = {FlightBusApogeeFactor * 100f:0}% of the {s.ApogeeMetres:0} m boost apogee); rotating to the direction of travel over {FlightBusRotateSeconds:0.0} s");
+                        s.BusVelocity += Vector3.down * FlightGravity * dt;
+                        if (s.BusVelocity.y <= 0f)
+                        {
+                            s.BusApogeeAt = s.Elapsed;
+                            s.BusApogeeHorizontal = new Vector3(s.BusVelocity.x, 0f, s.BusVelocity.z);
+                            s.BusRotateFrom = s.Bus.transform.rotation;
+                            Line(run, "APOGEE", $"t={s.Elapsed:0.0}s bus apogee {busPos.y - s.Launch.y:0.0} m above the launch point (target {s.BusTargetY - s.Launch.y:0.0} m = {FlightBusApogeeFactor * 100f:0}% of the {s.ApogeeMetres:0} m boost apogee); easing to {FlightBusDescentRate:0.0} m/s descent and to the booster drift over {FlightBusRotateSeconds:0.0} s, turning to the direction of travel");
+                        }
                     }
                     var busRot = s.Bus.transform.rotation;
                     if (s.BusApogeeAt >= 0f)
                     {
                         var turn = Mathf.Clamp01((s.Elapsed - s.BusApogeeAt) / FlightBusRotateSeconds);
+                        var horizontal = Vector3.Lerp(s.BusApogeeHorizontal, s.Forward * FlightBoosterDriftSpeed, turn);
+                        s.BusVelocity = new Vector3(horizontal.x, Mathf.Lerp(0f, -FlightBusDescentRate, turn), horizontal.z);
                         var travel = new Vector3(s.BusVelocity.x, 0f, s.BusVelocity.z);
                         if (travel.sqrMagnitude < 1e-4f) travel = Vector3.down;
                         busRot = Quaternion.Slerp(s.BusRotateFrom, FlightRotation(travel), turn);
                     }
+                    var busNext = busPos + s.BusVelocity * dt;
                     if (busNext.y < s.Launch.y - FlightImpactBelowLaunch)
                     {
-                        Line(run, "IMPACT", $"t={s.Elapsed:0.0}s bus reached the ground near {Pos(s.Bus.transform.position)}; killed");
+                        Line(run, "IMPACT", $"t={s.Elapsed:0.0}s bus reached the ground near {Pos(busPos)}; killed");
+                        s.Bus.Kill();
+                    }
+                    else if (!s.Straight && OutOfPlay(busNext, s))
+                    {
+                        Line(run, "FLOAT-OUT", $"t={s.Elapsed:0.0}s bus left the play area at {Pos(busNext)} (edge {s.HalfSize:0} m, kill margin {s.MarginMetres:0} m); killed");
                         s.Bus.Kill();
                     }
                     else
@@ -2273,7 +2297,7 @@ public class TheatricalNukeProbe : CarbonPlugin
                 if (boosterAlive)
                 {
                     var drift = s.Forward * FlightBoosterDriftSpeed + Vector3.down * FlightBoosterDescentRate;
-                    var boosterNext = s.Booster.transform.position + drift * FlightStepSeconds;
+                    var boosterNext = s.Booster.transform.position + drift * dt;
                     if (s.Straight && boosterNext.y < s.Launch.y - FlightImpactBelowLaunch)
                     {
                         Line(run, "IMPACT", $"t={s.Elapsed:0.0}s booster reached the ground near {Pos(s.Booster.transform.position)}; killed");
@@ -2309,6 +2333,9 @@ public class TheatricalNukeProbe : CarbonPlugin
         {
             s.NextLog = s.Elapsed + FlightLogSeconds;
             LogFlight(run, s);
+            Line(run, "TIMING", $"t={s.Elapsed:0.0}s: {s.Steps - s.StepsAtLog} steps in the last {FlightLogSeconds:0} s; longest step {s.MaxDt:0.00} s (nominal {FlightStepSeconds:0.00} s)");
+            s.StepsAtLog = s.Steps;
+            s.MaxDt = 0f;
         }
 
         var boosterGone = s.Booster == null || s.Booster.IsDestroyed;
