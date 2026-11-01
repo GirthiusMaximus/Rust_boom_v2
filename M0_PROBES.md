@@ -975,3 +975,15 @@ Check the banner says **v0.11.26**. Reload only when no probe is running and no 
 | 4 | `/probe end` | Closes the session. | |
 
 Send the `FLIGHT`, `APOGEE`, `TIMING` and `IMPACT` / `FLOAT-OUT` lines from the probe log.
+
+## SQLite check, plugin ObservationDbCheck v0.1.0 (2026-11-01)
+
+Separate plugin, not part of the probe. It tests whether a Carbon plugin can open an SQLite database through the Oxide SQLite extension, create a table, insert a row, and read it back. It references no SQLite assembly at compile time, so it compiles without the extension and cannot break the probe.
+
+| Step | Command | What to record |
+|---|---|---|
+| 1 | Load `ObservationDbCheck.cs` into `carbon/plugins`. Check the console shows no compile error. | Any compile error (copy the line). |
+| 2 | Run `/dbcheck` in chat as an admin, or `dbcheck.run` in the console. | The console line that gives the log path. |
+| 3 | Open the log file named in the console. It is at `carbon/logs/ObservationDbCheck/dbcheck_<yyyyMMdd-HHmmss>.log`. | The last line: `VERDICT PASS` or `VERDICT FAIL`, and the lines tagged `EXCEPTION` or `CALL`. |
+
+The log is extremely verbose: every loaded assembly that matches, every type lookup, every library member, each SQL statement and argument, each call and its return value, each callback, and the list of database files found afterwards. If it fails, send the whole log file.
