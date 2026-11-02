@@ -1,4 +1,4 @@
-// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.2.
+// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.3.
 //
 // Zen Panel (CodeFling, Brad Copp) is a RUNTIME dependency only. This file never references Zen Panel's
 // code or types; it looks the plugin up by name and calls its public API_ methods with Call(). Zen Panel code
@@ -29,11 +29,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("ObservationPanel", "Theatrical Nuke", "0.1.2")]
+[Info("ObservationPanel", "Theatrical Nuke", "0.1.3")]
 [Description("Observations tab on Zen Panel. Saves each submitted observation to SQLite before the UI changes.")]
 public class ObservationPanel : CarbonPlugin
 {
-    private const string Version = "0.1.2";
+    private const string Version = "0.1.3";
     private const string ZenPanelName = "ZenPanel";
     private const string TabId = "observations";
     private const string TabTitle = "Observations";
@@ -407,6 +407,10 @@ public class ObservationPanel : CarbonPlugin
             if (!_boxOpen.Contains(uid)) return;
 
             var text = FullText(uid);
+            // v0.1.3: show what arrived, so a cut in the input field is visible at once.
+            var tail = text.Length > 40 ? text.Substring(text.Length - 40) : text;
+            var endsMidWord = text.Length > 0 && char.IsLetter(text[text.Length - 1]);
+            Debug("RECEIVED", $"{player.UserIDString} characters={text.Length} parts={PartCount(uid)} ends_mid_word={endsMidWord} tail=\"{tail.Replace("\n", " ")}\"");
             if (string.IsNullOrWhiteSpace(text))
             {
                 Debug("SAVE", $"{player.UserIDString} submit with empty text; nothing saved, box stays open");
@@ -428,7 +432,8 @@ public class ObservationPanel : CarbonPlugin
             CuiHelper.DestroyUi(player, BoxName);
             _boxOpen.Remove(uid);
             Debug("SAVE", $"{player.UserIDString} observation #{id} saved and read back; characters={text.Length}; parts={partCount}");
-            player.ChatMessage($"Observation #{id} saved ({text.Length} characters).");
+            player.ChatMessage($"Observation #{id} saved: {text.Length} characters received, ending \"{tail.Replace("\n", " ")}\"."
+                + (endsMidWord ? " It ends mid-word, so the input may have been cut." : string.Empty));
         }
         catch (Exception ex)
         {
