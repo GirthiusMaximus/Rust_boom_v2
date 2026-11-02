@@ -1,4 +1,4 @@
-// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.3.
+// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.4.
 //
 // Zen Panel (CodeFling, Brad Copp) is a RUNTIME dependency only. This file never references Zen Panel's
 // code or types; it looks the plugin up by name and calls its public API_ methods with Call(). Zen Panel code
@@ -29,11 +29,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("ObservationPanel", "Theatrical Nuke", "0.1.3")]
+[Info("ObservationPanel", "Theatrical Nuke", "0.1.4")]
 [Description("Observations tab on Zen Panel. Saves each submitted observation to SQLite before the UI changes.")]
 public class ObservationPanel : CarbonPlugin
 {
-    private const string Version = "0.1.3";
+    private const string Version = "0.1.4";
     private const string ZenPanelName = "ZenPanel";
     private const string TabId = "observations";
     private const string TabTitle = "Observations";
@@ -47,7 +47,9 @@ public class ObservationPanel : CarbonPlugin
     private const string CmdClose = "obspanel.close";
     private const string CmdClear = "obspanel.clear";
     private const string ProbeLabel = "free";
-    private const int MaxChars = 6000;
+    // v0.1.4: each part is capped at PartChars. The input field stops accepting text at that point, so nothing
+    // is cut silently. Typed input has been cut at 79 and 109 characters, so parts stay well under those.
+    private const int PartChars = 60;
     private const int ListCount = 8;
     private const int PreviewChars = 110;
     private const float CommitDelaySeconds = 0.6f;
@@ -341,7 +343,7 @@ public class ObservationPanel : CarbonPlugin
     {
         var uid = player.userID;
         var kept = KeptSummary(uid);
-        var title = "New observation. Type, then Add part to keep the text and continue, or Submit to save everything "
+        var title = "New observation. Each part holds up to " + PartChars + " characters. Add part keeps it and starts the next; Submit saves all parts as typed. "
             + "to the database. X discards.";
 
         using var cui = new CUI(CuiHandler);
@@ -358,7 +360,7 @@ public class ObservationPanel : CarbonPlugin
         cui.v2.CreateText(box, new LuiPosition(0.03f, 0.76f, 0.97f, 0.86f), LuiOffset.None, 12, "0.7 0.7 0.7 1", kept, TextAnchor.UpperLeft);
 
         var input = cui.v2.CreateInput(box, new LuiPosition(0.03f, 0.22f, 0.97f, 0.74f), LuiOffset.None, "1 1 1 1", string.Empty, 14, CmdText,
-            charLimit: MaxChars, isProtected: false, alignment: TextAnchor.UpperLeft);
+            charLimit: PartChars, isProtected: false, alignment: TextAnchor.UpperLeft);
         input.SetInputAutoFocus(true);
         input.SetInputKeyboard(true);
 
@@ -386,10 +388,12 @@ public class ObservationPanel : CarbonPlugin
             }
             _current[uid] = string.Empty;
             Debug("BOX", $"{player.UserIDString} part kept: characters={text.Length}; parts now {PartCount(uid)}");
+            var full = text.Length >= PartChars;
 
             CuiHelper.DestroyUi(player, BoxName);
             SendBox(player);
-            player.ChatMessage($"Part {PartCount(uid)} kept. Keep typing, then Add part again or Submit.");
+            player.ChatMessage($"Part {PartCount(uid)} kept ({text.Length} characters)."
+                + (full ? " That part is full; the field stops at " + PartChars + " characters. Press Add part to continue." : " Keep typing, then Add part again or Submit."));
         }
         catch (Exception ex)
         {
@@ -454,7 +458,8 @@ public class ObservationPanel : CarbonPlugin
         var pieces = new List<string>();
         if (_parts.TryGetValue(uid, out var list)) pieces.AddRange(list);
         if (_current.TryGetValue(uid, out var cur) && !string.IsNullOrWhiteSpace(cur)) pieces.Add(cur);
-        return string.Join("\n", pieces);
+        // v0.1.4: parts are joined exactly as typed, with no added separator, so the saved text matches the input.
+        return string.Concat(pieces);
     }
 
     private int PartCount(ulong uid) => _parts.TryGetValue(uid, out var list) ? list.Count : 0;
