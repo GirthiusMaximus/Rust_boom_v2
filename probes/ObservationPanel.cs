@@ -1,4 +1,4 @@
-// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.0.
+// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.1.
 //
 // Zen Panel (CodeFling, Brad Copp) is a RUNTIME dependency only. This file never references Zen Panel's
 // code or types; it looks the plugin up by name and calls its public API_ methods with Call(). Zen Panel code
@@ -23,16 +23,17 @@ using System.Reflection;
 using System.Text;
 using Carbon.Components;
 using Carbon.Plugins;
+using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
 using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("ObservationPanel", "Theatrical Nuke", "0.1.0")]
+[Info("ObservationPanel", "Theatrical Nuke", "0.1.1")]
 [Description("Observations tab on Zen Panel. Saves each submitted observation to SQLite before the UI changes.")]
 public class ObservationPanel : CarbonPlugin
 {
-    private const string Version = "0.1.0";
+    private const string Version = "0.1.1";
     private const string ZenPanelName = "ZenPanel";
     private const string TabId = "observations";
     private const string TabTitle = "Observations";
@@ -460,13 +461,25 @@ public class ObservationPanel : CarbonPlugin
 
     private bool SaveObservation(BasePlayer player, string probeId, string text, int partCount, out long id, out string error)
     {
+        return SaveRow(probeId, player.UserIDString, player.displayName ?? string.Empty, text, partCount, out id, out error);
+    }
+
+    // Public API for other plugins (the probes). Returns "saved:<id>" or "error:<message>". Called with Call().
+    public string OP_SaveObservation(string probeId, string steamId, string playerName, string text, int parts)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "error:empty text";
+        var ok = SaveRow(probeId ?? ProbeLabel, steamId ?? "server", playerName ?? "server", text, parts <= 0 ? 1 : parts,
+            out var id, out var error);
+        return ok ? "saved:" + id : "error:" + error;
+    }
+
+    private bool SaveRow(string probeId, string steam, string name, string text, int partCount, out long id, out string error)
+    {
         id = 0;
         error = null;
         try
         {
             var created = DateTime.UtcNow.ToString("O");
-            var steam = player.UserIDString;
-            var name = player.displayName ?? string.Empty;
             id = WithDb(conn =>
             {
                 Exec(conn, "CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY AUTOINCREMENT, created_utc TEXT NOT NULL, steam_id TEXT NOT NULL, player_name TEXT NOT NULL, probe_id TEXT NOT NULL, text TEXT NOT NULL, characters INTEGER NOT NULL, parts INTEGER NOT NULL)");
