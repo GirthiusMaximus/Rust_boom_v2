@@ -11,6 +11,11 @@
 //     timing and exception (with inner exceptions and stack) is written to one log file per run.
 //   * It never touches the probe's session logs or any probe state.
 //
+// v0.1.1: when the Oxide SQLite extension is missing (the v0.1.0 result), the check falls back to the
+// ADO.NET provider Mono.Data.Sqlite, which the server already loads, and runs the same create/insert/read
+// test through the standard IDbConnection and IDbCommand members. Facepunch.Sqlite (Rust's own wrapper)
+// is listed in the log for reference. Nothing is called on Facepunch.Sqlite.
+//
 // Usage (admin):
 //   /dbcheck            chat command; runs the check
 //   dbcheck.run         console command; runs the check
@@ -33,11 +38,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("ObservationDbCheck", "Theatrical Nuke", "0.1.0")]
+[Info("ObservationDbCheck", "Theatrical Nuke", "0.1.3")]
 [Description("Checks whether this server can write to an SQLite database from a plugin. Logs every step.")]
 public class ObservationDbCheck : CarbonPlugin
 {
-    private const string Version = "0.1.0";
+    private const string Version = "0.1.3";
     private const string LogDirectory = "carbon/logs/ObservationDbCheck";
     private const string DbName = "ObservationDbCheck_check";
     private const string Table = "dbcheck_probe";
@@ -50,6 +55,7 @@ public class ObservationDbCheck : CarbonPlugin
     private bool _running;
     private object _library;
     private object _connection;
+    private object _adoConnection;
     private string _token = string.Empty;
     private BasePlayer _requester;
     private DateTime _startedUtc;
@@ -114,8 +120,14 @@ public class ObservationDbCheck : CarbonPlugin
             ScanAssemblies();
             FindTypes();
             _stage = "library";
+            DumpAssemblyTypes("Facepunch.Sqlite");
             _library = GetLibraryInstance();
-            if (_library == null) { FinishRun("FAIL: could not get the Oxide SQLite library instance (see the lines above)"); return; }
+            if (_library == null)
+            {
+                WriteLog("LIBRARY", "Oxide SQLite extension not available. Falling back to the ADO.NET provider (Mono.Data.Sqlite).");
+                AdoNetCheck();
+                return;
+            }
             DumpMembers(_library, "library");
             _stage = "open";
             OpenDatabase();
@@ -277,12 +289,267 @@ public class ObservationDbCheck : CarbonPlugin
         {
             CallLib("CloseDb", new object[] { _connection, this }, r => WriteLog("CLOSE", $"CloseDb returned: {Describe(r)}"));
         }
+        if (_adoConnection != null)
+        {
+            try
+            {
+                InvokeNamed(_adoConnection, "Close");
+                WriteLog("CLOSE", "ADO.NET connection closed");
+            }
+            catch (Exception ex)
+            {
+                LogException("ADO close", ex);
+            }
+        }
         ListDataFiles();
         var line = verdict.StartsWith("PASS", StringComparison.Ordinal) ? "SQLite check PASSED" : "SQLite check FAILED";
         Puts($"ObservationDbCheck: {line}. {verdict}. Log: {Path.GetFullPath(_logPath)}");
         if (_requester != null && !_requester.IsDestroyed)
         {
             _requester.ChatMessage($"{line}. Log: {_logPath}");
+        }
+    }
+
+
+    // ── ADO.NET fallback (v0.1.1) ────────────────────────────────────────────
+
+    private void AdoNetCheck()
+    {
+        _stage = "ado-open";
+        try
+        {
+            var connType = FindType("Mono.Data.Sqlite.SqliteConnection");
+            WriteLog("ADO", $"Mono.Data.Sqlite.SqliteConnection: {(connType == null ? "not found" : connType.AssemblyQualifiedName)}");
+            if (connType == null)
+            {
+                FinishRun("FAIL: neither the Oxide SQLite extension nor the ADO.NET provider Mono.Data.Sqlite is available");
+                return;
+            }
+            LogTypeMembers(connType, "ADO connection type");
+
+            var dir = Path.Combine(Directory.GetCurrentDirectory(), "carbon", "data", "ObservationDbCheck");
+            Directory.CreateDirectory(dir);
+            var dbPath = Path.Combine(dir, DbName + ".db");
+            var connString = "Data Source=" + dbPath + ";Version=3;";
+            WriteLog("ADO", $"database file: {dbPath} (exists before open: {File.Exists(dbPath)})");
+            WriteLog("ADO", $"connection string: {connString}");
+
+            _adoConnection = Activator.CreateInstance(connType, new object[] { connString });
+            WriteLog("ADO", $"constructed: {Describe(_adoConnection)}");
+            InvokeNamed(_adoConnection, "Open");
+            WriteLog("ADO", $"state after Open: {GetProp(_adoConnection, "State")}");
+            WriteLog("ADO", $"database file exists after Open: {File.Exists(dbPath)}");
+
+            var version = ScalarQuery("SELECT sqlite_version()", new List<KeyValuePair<string, object>>());
+            WriteLog("ADO", $"sqlite_version(): {Describe(version)}");
+
+            _stage = "ado-create";
+            ExecuteNonQueryAdo("create", $"CREATE TABLE IF NOT EXISTS {Table} (id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT NOT NULL, created_utc TEXT NOT NULL, value INTEGER NOT NULL)",
+                new List<KeyValuePair<string, object>>());
+
+            _stage = "ado-insert";
+            var inserted = ExecuteNonQueryAdo("insert", $"INSERT INTO {Table} (token, created_utc, value) VALUES (@token, @created, @value)",
+                new List<KeyValuePair<string, object>>
+                {
+                    new KeyValuePair<string, object>("@token", _token),
+                    new KeyValuePair<string, object>("@created", DateTime.UtcNow.ToString("O")),
+                    new KeyValuePair<string, object>("@value", 42),
+                });
+            WriteLog("ADO", $"insert rows affected: {inserted}; database file size now: {(File.Exists(dbPath) ? new FileInfo(dbPath).Length : -1)} bytes");
+
+            _stage = "ado-select";
+            // v0.1.3: the v0.1.2 run inserted the row (rows affected 1, token present in the file) but the
+            // parameterised SELECT returned 0 rows. Log the row count of the table, then read it two ways:
+            // 1) parameterised SELECT (the original test), 2) unparameterised SELECT of the newest rows,
+            // matched on the token in code. The check passes if either read returns the token. The log says
+            // which read found it, so a driver binding problem is visible.
+            var total = ScalarQuery($"SELECT COUNT(*) FROM {Table}", new List<KeyValuePair<string, object>>());
+            WriteLog("ADO", $"row count in {Table} before select: {Describe(total)}");
+
+            var rows = ReadRowsAdo($"SELECT id, token, created_utc, value FROM {Table} WHERE token = @token",
+                new List<KeyValuePair<string, object>> { new KeyValuePair<string, object>("@token", _token) });
+            WriteLog("ADO", $"parameterised select returned {rows.Count} row(s)");
+            if (rows.Count > 0)
+            {
+                WriteLog("ADO", "read method: parameterised SELECT (@token) found the token");
+                VerifyResult(rows);
+                return;
+            }
+
+            _stage = "ado-select-unparameterised";
+            var recent = ReadRowsAdo($"SELECT id, token, created_utc, value FROM {Table} ORDER BY id DESC LIMIT 50",
+                new List<KeyValuePair<string, object>>());
+            WriteLog("ADO", $"unparameterised select returned {recent.Count} row(s)");
+            foreach (var row in recent)
+            {
+                WriteLog("ADO", "  row: " + string.Join(", ", row.Select(kv => kv.Key + "=" + Describe(kv.Value))));
+            }
+            var matched = recent.Where(r => Convert.ToString(r.ContainsKey("token") ? r["token"] : null) == _token).ToList();
+            if (matched.Count > 0)
+            {
+                WriteLog("ADO", "read method: unparameterised SELECT found the token; parameter binding on read is suspect (the insert bound correctly)");
+            }
+            else
+            {
+                WriteLog("ADO", "read method: neither the parameterised nor the unparameterised SELECT returned the token");
+            }
+            VerifyResult(matched);
+        }
+        catch (Exception ex)
+        {
+            LogException("ADO check", ex);
+            FinishRun($"FAIL: ADO.NET check threw at stage '{_stage}' (see the EXCEPTION lines above)");
+        }
+    }
+
+    private int ExecuteNonQueryAdo(string label, string text, List<KeyValuePair<string, object>> parameters)
+    {
+        var cmd = CreateAdoCommand(text, parameters);
+        var started = DateTime.UtcNow;
+        var result = InvokeNamed(cmd, "ExecuteNonQuery");
+        WriteLog("ADO", $"{label}: ExecuteNonQuery returned {Describe(result)} in {(DateTime.UtcNow - started).TotalMilliseconds:0} ms");
+        DisposeQuietly(cmd, label);
+        return result is int n ? n : -1;
+    }
+
+    private object ScalarQuery(string text, List<KeyValuePair<string, object>> parameters)
+    {
+        var cmd = CreateAdoCommand(text, parameters);
+        var value = InvokeNamed(cmd, "ExecuteScalar");
+        DisposeQuietly(cmd, "scalar");
+        return value;
+    }
+
+    private List<Dictionary<string, object>> ReadRowsAdo(string text, List<KeyValuePair<string, object>> parameters)
+    {
+        var rows = new List<Dictionary<string, object>>();
+        var cmd = CreateAdoCommand(text, parameters);
+        var reader = InvokeNamed(cmd, "ExecuteReader");
+        try
+        {
+            var fieldCount = Convert.ToInt32(GetProp(reader, "FieldCount"));
+            WriteLog("ADO", $"reader opened: {fieldCount} field(s)");
+            while (Convert.ToBoolean(InvokeNamed(reader, "Read")))
+            {
+                var row = new Dictionary<string, object>();
+                for (var i = 0; i < fieldCount; i++)
+                {
+                    var name = Convert.ToString(InvokeNamed(reader, "GetName", i));
+                    row[name] = InvokeNamed(reader, "GetValue", i);
+                }
+                rows.Add(row);
+            }
+        }
+        finally
+        {
+            DisposeQuietly(reader, "reader");
+            DisposeQuietly(cmd, "select");
+        }
+        return rows;
+    }
+
+    private object CreateAdoCommand(string text, List<KeyValuePair<string, object>> parameters)
+    {
+        var cmd = InvokeNamed(_adoConnection, "CreateCommand");
+        SetProp(cmd, "CommandText", text);
+        WriteLog("ADO", $"command: {text} | parameters: [{string.Join(", ", parameters.Select(p => p.Key + "=" + Describe(p.Value)))}]");
+        foreach (var kv in parameters)
+        {
+            var p = InvokeNamed(cmd, "CreateParameter");
+            SetProp(p, "ParameterName", kv.Key);
+            SetProp(p, "Value", kv.Value);
+            var coll = GetProp(cmd, "Parameters");
+            InvokeNamed(coll, "Add", p);
+        }
+        return cmd;
+    }
+
+    private void DisposeQuietly(object o, string label)
+    {
+        if (o == null) return;
+        try
+        {
+            var d = o as IDisposable;
+            if (d != null) d.Dispose();
+        }
+        catch (Exception ex)
+        {
+            WriteLog("ADO", $"dispose {label} threw: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    // Calls a public instance or static method by name and argument count, logging the call and its result.
+    private object InvokeNamed(object target, string name, params object[] args)
+    {
+        if (target == null) throw new ArgumentNullException(name, "target is null");
+        var candidates = target.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+            .Where(m => m.Name == name && m.GetParameters().Length == args.Length)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            throw new MissingMethodException(target.GetType().FullName, name);
+        }
+        var m2 = candidates[0];
+        var result = m2.Invoke(m2.IsStatic ? null : target, args);
+        WriteLog("INVOKE", $"{target.GetType().Name}.{name}({string.Join(", ", args.Select(Describe))}) -> {Describe(result)}");
+        return result;
+    }
+
+    // v0.1.1: GetProperty(name) throws AmbiguousMatchException when a class also implements the
+    // interface property explicitly (SqliteCommand.Parameters). Pick the public property declared on the
+    // runtime type first, and fall back to the first public match.
+    private static PropertyInfo FindProp(Type t, string name)
+    {
+        var all = t.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+            .Where(p => p.Name == name).ToList();
+        return all.FirstOrDefault(p => p.DeclaringType == t) ?? all.FirstOrDefault();
+    }
+
+    private static object GetProp(object target, string name)
+    {
+        var p = FindProp(target.GetType(), name);
+        if (p == null) return "(no property " + name + ")";
+        var getter = p.GetGetMethod(true);
+        return p.GetValue(getter != null && getter.IsStatic ? null : target, null);
+    }
+
+    private static void SetProp(object target, string name, object value)
+    {
+        var p = FindProp(target.GetType(), name);
+        if (p == null || !p.CanWrite) throw new MissingMemberException(target.GetType().FullName, name);
+        p.SetValue(target, value, null);
+    }
+
+    private void LogTypeMembers(Type t, string label)
+    {
+        WriteLog("MEMBERS", $"{label}: {t.FullName}");
+        foreach (var c in t.GetConstructors(BindingFlags.Public | BindingFlags.Instance))
+        {
+            WriteLog("MEMBERS", $"{label} ctor: ({string.Join(", ", c.GetParameters().Select(p => TypeName(p.ParameterType) + " " + p.Name))})");
+        }
+        var names = t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+            .Where(m => m.DeclaringType != typeof(object))
+            .Select(m => m.Name).Distinct().OrderBy(n => n);
+        WriteLog("MEMBERS", $"{label} public methods: {string.Join(", ", names)}");
+    }
+
+    // Lists the public types of one loaded assembly, for reference only. Nothing is called on them.
+    private void DumpAssemblyTypes(string assemblyName)
+    {
+        var asm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == assemblyName);
+        if (asm == null)
+        {
+            WriteLog("REFERENCE", $"{assemblyName}: assembly not loaded");
+            return;
+        }
+        WriteLog("REFERENCE", $"{assemblyName} {asm.GetName().Version} loaded from {(asm.IsDynamic ? "(dynamic)" : asm.Location)}");
+        Type[] types;
+        try { types = asm.GetExportedTypes(); }
+        catch (Exception ex) { WriteLog("REFERENCE", $"{assemblyName}: could not list types: {ex.Message}"); return; }
+        WriteLog("REFERENCE", $"{assemblyName}: {types.Length} exported type(s)");
+        foreach (var t in types.Take(80))
+        {
+            WriteLog("REFERENCE", $"  {t.FullName} (methods: {string.Join(", ", t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).Where(m => m.DeclaringType == t).Select(m => m.Name).Distinct().Take(20))})");
         }
     }
 
