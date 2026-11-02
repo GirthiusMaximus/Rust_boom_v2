@@ -760,6 +760,37 @@ public class TheatricalNukeProbe : CarbonPlugin
     }
 
     // Saves one observation for the head of the queue, then opens the next box or closes the session.
+    // Sends one observation to the ObservationPanel plugin (Observations tab on Zen Panel) by runtime Call.
+    // Returns false with a reason when the panel is not loaded or the save did not read back.
+    private bool SaveToObservationPanel(BasePlayer op, ProbeRun run, string text, string source, out string error)
+    {
+        error = null;
+        try
+        {
+            var panel = plugins.Find("ObservationPanel");
+            if (panel == null)
+            {
+                error = "ObservationPanel is not loaded";
+                return false;
+            }
+            var reply = panel.Call("OP_SaveObservation", run.Id, op != null ? op.UserIDString : "server",
+                op != null ? op.displayName : "server", text, 1) as string;
+            if (reply != null && reply.StartsWith("saved:", StringComparison.Ordinal))
+            {
+                SessionLine("SAVE", $"{run.Id} stored in ObservationPanel as #{reply.Substring(6)} (source: {source})");
+                return true;
+            }
+            error = reply != null && reply.StartsWith("error:", StringComparison.Ordinal) ? reply.Substring(6) : "no reply from ObservationPanel";
+            return false;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            ErrorLog(run, "save to ObservationPanel", ex);
+            return false;
+        }
+    }
+
     private void CollectHead(BasePlayer op, string text, string source)
     {
         if (_pendingObs.Count == 0)
@@ -781,6 +812,14 @@ public class TheatricalNukeProbe : CarbonPlugin
         {
             SessionLine("BOX", $"observation for {run.Id} rejected: {words} words exceeds {MaxObservationWords}");
             op?.ChatMessage($"Observation is {words} words; the limit is {MaxObservationWords}. Shorten it and submit again.");
+            return;
+        }
+
+        // Save to ObservationPanel (SQLite, read back) before the queue or the box changes. On failure nothing changes.
+        if (!SaveToObservationPanel(op, run, text, source, out var saveError))
+        {
+            SessionLine("SAVE", $"{run.Id} NOT saved to ObservationPanel: {saveError}. Text kept in this log: characters={text.Length} text=\"{EscapeText(text)}\"");
+            op?.ChatMessage($"{run.Id} is NOT saved: {saveError}. Nothing was discarded; fix the cause and submit again.");
             return;
         }
 
