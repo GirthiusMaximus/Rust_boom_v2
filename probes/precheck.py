@@ -94,7 +94,7 @@ def undefined_calls(src):
     String and comment text is already stripped, so SQL words and log text are not checked.
     """
     code = strip_code(src)
-    defined = set(re.findall(r"(?:private|public|internal|protected|static)[^=;(]*?\b(\w+)\s*\(", code))
+    defined = set(re.findall(r"(?:private|public|internal|protected|static)[^=;(]*?\b(\w+)\s*(?:<[^>()]*>)?\s*\(", code))  # v0.11.28: generic methods (Name<T>(...))
     defined |= set(re.findall(r"\bclass\s+(\w+)", code))
     problems = []
     for m in re.finditer(r"(?<![\.\w])([A-Z]\w*)\s*\(", code):
