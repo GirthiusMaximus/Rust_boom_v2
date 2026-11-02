@@ -1,4 +1,4 @@
-// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.1.
+// ObservationPanel.cs — Observations tab on Zen Panel, v0.1.2.
 //
 // Zen Panel (CodeFling, Brad Copp) is a RUNTIME dependency only. This file never references Zen Panel's
 // code or types; it looks the plugin up by name and calls its public API_ methods with Call(). Zen Panel code
@@ -29,11 +29,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("ObservationPanel", "Theatrical Nuke", "0.1.1")]
+[Info("ObservationPanel", "Theatrical Nuke", "0.1.2")]
 [Description("Observations tab on Zen Panel. Saves each submitted observation to SQLite before the UI changes.")]
 public class ObservationPanel : CarbonPlugin
 {
-    private const string Version = "0.1.1";
+    private const string Version = "0.1.2";
     private const string ZenPanelName = "ZenPanel";
     private const string TabId = "observations";
     private const string TabTitle = "Observations";
@@ -72,9 +72,15 @@ public class ObservationPanel : CarbonPlugin
             Debug("START", $"ObservationPanel v{Version} started; log {_logPath}");
             Debug("START", $"runtime {Environment.Version}; unity {Application.unityVersion}");
 
-            // Opens and closes the database once, so a missing provider shows at start, not on the first submit.
-            var count = CountObservations();
-            Debug("DB", $"database ready; {count} observation(s) stored");
+            try
+            {
+                EnsureDatabase();
+            }
+            catch (Exception ex)
+            {
+                // Logged in full; the tab still registers so the failure is visible in the UI and the log.
+                LogException("database setup", ex);
+            }
             RegisterTab();
         }
         catch (Exception ex)
@@ -482,7 +488,6 @@ public class ObservationPanel : CarbonPlugin
             var created = DateTime.UtcNow.ToString("O");
             id = WithDb(conn =>
             {
-                Exec(conn, "CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY AUTOINCREMENT, created_utc TEXT NOT NULL, steam_id TEXT NOT NULL, player_name TEXT NOT NULL, probe_id TEXT NOT NULL, text TEXT NOT NULL, characters INTEGER NOT NULL, parts INTEGER NOT NULL)");
                 Exec(conn,
                     "INSERT INTO observations (created_utc, steam_id, player_name, probe_id, text, characters, parts) VALUES (@created, @steam, @name, @probe, @text, @chars, @parts)",
                     ("@created", created), ("@steam", steam), ("@name", name), ("@probe", probeId),
@@ -556,12 +561,39 @@ public class ObservationPanel : CarbonPlugin
         var type = FindSqliteConnectionType();
         if (type == null) throw new InvalidOperationException("Mono.Data.Sqlite.SqliteConnection is not loaded on this server");
 
-        var dir = Path.Combine(Directory.GetCurrentDirectory(), "carbon", "data", "ObservationPanel");
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, DbFile + ".db");
+        var path = DatabasePath();
         var conn = Activator.CreateInstance(type, new object[] { "Data Source=" + path + ";Version=3;" });
         DynInvoke(conn, "Open");
+        // SQLite creates the file on first open. Create the table on every open, so a missing or emptied file
+        // is rebuilt before any read or write.
+        Exec(conn, Schema);
         return conn;
+    }
+
+    private const string Schema = "CREATE TABLE IF NOT EXISTS observations (id INTEGER PRIMARY KEY AUTOINCREMENT, created_utc TEXT NOT NULL, steam_id TEXT NOT NULL, player_name TEXT NOT NULL, probe_id TEXT NOT NULL, text TEXT NOT NULL, characters INTEGER NOT NULL, parts INTEGER NOT NULL)";
+
+    // Startup check: report whether the file and the table exist, creating both when missing.
+    private void EnsureDatabase()
+    {
+        var path = DatabasePath();
+        var existed = File.Exists(path);
+        Debug("DB", $"database file {path}: {(existed ? "found" : "not found; SQLite creates it on first open")}");
+
+        WithDb(conn =>
+        {
+            var tables = Convert.ToInt64(Scalar(conn, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'observations'"));
+            if (tables != 1) throw new InvalidOperationException("table 'observations' is missing after schema creation");
+            var rows = Convert.ToInt64(Scalar(conn, "SELECT COUNT(*) FROM observations"));
+            Debug("DB", $"table 'observations' ready; {rows} row(s); file now {new FileInfo(path).Length} bytes");
+            return rows;
+        });
+    }
+
+    private static string DatabasePath()
+    {
+        var dir = Path.Combine(Directory.GetCurrentDirectory(), "carbon", "data", "ObservationPanel");
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, DbFile + ".db");
     }
 
     private static Type FindSqliteConnectionType()
