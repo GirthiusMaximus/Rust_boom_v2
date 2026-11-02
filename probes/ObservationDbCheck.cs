@@ -38,11 +38,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("ObservationDbCheck", "Theatrical Nuke", "0.1.3")]
+[Info("ObservationDbCheck", "Theatrical Nuke", "0.1.4")]
 [Description("Checks whether this server can write to an SQLite database from a plugin. Logs every step.")]
 public class ObservationDbCheck : CarbonPlugin
 {
-    private const string Version = "0.1.3";
+    private const string Version = "0.1.4";
     private const string LogDirectory = "carbon/logs/ObservationDbCheck";
     private const string DbName = "ObservationDbCheck_check";
     private const string Table = "dbcheck_probe";
@@ -387,12 +387,31 @@ public class ObservationDbCheck : CarbonPlugin
             var matched = recent.Where(r => Convert.ToString(r.ContainsKey("token") ? r["token"] : null) == _token).ToList();
             if (matched.Count > 0)
             {
-                WriteLog("ADO", "read method: unparameterised SELECT found the token; parameter binding on read is suspect (the insert bound correctly)");
+                WriteLog("ADO", "read method: unparameterised DataReader found the token");
+                VerifyResult(matched);
+                return;
             }
-            else
+
+            // v0.1.4: the DataReader's Read() returned false even when COUNT(*) reported 2 rows (session 193901).
+            // ExecuteScalar works on this connection, so read back with scalar queries only.
+            _stage = "ado-select-scalar";
+            WriteLog("ADO", "DataReader.Read() returned false although rows exist; trying scalar reads (ExecuteScalar)");
+            var scalarParam = ScalarQuery($"SELECT token FROM {Table} WHERE token = @token LIMIT 1",
+                new List<KeyValuePair<string, object>> { new KeyValuePair<string, object>("@token", _token) });
+            WriteLog("ADO", $"scalar parameterised select returned: {Describe(scalarParam)}");
+            var allTokens = ScalarQuery($"SELECT group_concat(token, ',') FROM {Table}",
+                new List<KeyValuePair<string, object>>());
+            WriteLog("ADO", $"scalar group_concat of all tokens: {Describe(allTokens)}");
+
+            var scalarFound = Convert.ToString(scalarParam) == _token
+                || (Convert.ToString(allTokens) ?? "").Split(',').Contains(_token);
+            if (scalarFound)
             {
-                WriteLog("ADO", "read method: neither the parameterised nor the unparameterised SELECT returned the token");
+                WriteLog("ADO", "read method: scalar query found the token (DataReader path did not return rows)");
+                VerifyResult(new List<Dictionary<string, object>> { new Dictionary<string, object> { { "token", _token } } });
+                return;
             }
+            WriteLog("ADO", "read method: no read method (DataReader or scalar) returned the token");
             VerifyResult(matched);
         }
         catch (Exception ex)
