@@ -76,6 +76,41 @@ def strip_code(src):
     return "".join(out)
 
 
+# Names that look like calls but are not methods defined in the file: attributes, Carbon/Unity/C# built-ins.
+CALL_ALLOWLIST = {
+    "ChatCommand", "ConsoleCommand", "Description", "Info", "Puts", "Usage",
+    "If", "For", "While", "Switch", "Catch", "Using", "Lock", "Typeof", "Nameof", "Default", "Sizeof", "Return",
+    # Inherited from System.Object, so valid without a local definition.
+    "ReferenceEquals", "GetType", "ToString", "Equals", "GetHashCode", "MemberwiseClone",
+    # Attribute class name used as [HarmonyPatch(...)].
+    "HarmonyPatch",
+}
+
+
+def undefined_calls(src):
+    """Rule 13: an unqualified PascalCase call with no matching method in the file (CS0103).
+
+    Catches a rename that missed a call site, for example `Insert()` after `Insert` became `InsertStep`.
+    String and comment text is already stripped, so SQL words and log text are not checked.
+    """
+    code = strip_code(src)
+    defined = set(re.findall(r"(?:private|public|internal|protected|static)[^=;(]*?\b(\w+)\s*\(", code))
+    defined |= set(re.findall(r"\bclass\s+(\w+)", code))
+    problems = []
+    for m in re.finditer(r"(?<![\.\w])([A-Z]\w*)\s*\(", code):
+        name = m.group(1)
+        before = code[max(0, m.start() - 4):m.start()]
+        if before.endswith("new ") or name in CALL_ALLOWLIST or name in defined:
+            continue
+        line = code.count("\n", 0, m.start()) + 1
+        problems.append(("ERROR", f"line {line}: call to '{name}()' but no method of that name is defined (CS0103). Check for a rename that missed a call site."))
+    return problems
+
+
+def all_plugin_files():
+    return sorted(PLUGIN.parent.glob("*.cs"))
+
+
 def check_source(src):
     """Return a list of (level, message) for one plugin source text."""
     problems = []
@@ -286,6 +321,21 @@ def selftest():
         caught = any(level == "ERROR" for level, _ in problems)
         print(f"SELFTEST {'PASS' if caught else 'FAIL'} {name}")
         failed += 0 if caught else 1
+    check_file = PLUGIN.with_name("ObservationDbCheck.cs")
+    if check_file.exists():
+        check_src = check_file.read_text(encoding="utf-8-sig")
+        anchor = "result => InsertStep());"
+        if check_src.count(anchor) < 1:
+            print("SELFTEST SKIP undefined call: anchor text not found")
+            failed += 1
+        else:
+            mutated = check_src.replace(anchor, "result => Insert());", 1)
+            caught = any(level == "ERROR" for level, _ in undefined_calls(mutated))
+            print(f"SELFTEST {'PASS' if caught else 'FAIL'} undefined call (renamed method, missed call site)")
+            failed += 0 if caught else 1
+            clean = [m for lvl, m in undefined_calls(check_src) if lvl == "ERROR"]
+            print(f"SELFTEST baseline (ObservationDbCheck.cs): undefined-call errors={len(clean)}")
+            failed += 1 if clean else 0
     base, _ = check_source(src)
     base_errors = [m for lvl, m in base if lvl == "ERROR"]
     print(f"SELFTEST baseline (real file): errors={len(base_errors)}")
@@ -298,6 +348,9 @@ def main():
         return selftest()
     src = PLUGIN.read_text(encoding="utf-8-sig")
     problems, versions = check_source(src)
+    for f in all_plugin_files():
+        for lvl, msg in undefined_calls(f.read_text(encoding="utf-8-sig")):
+            problems.append((lvl, f"{f.name}: {msg}"))
     errors = [m for lvl, m in problems if lvl == "ERROR"]
     for lvl, msg in problems:
         print(f"{lvl}: {msg}")

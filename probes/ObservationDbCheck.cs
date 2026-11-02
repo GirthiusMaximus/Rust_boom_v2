@@ -225,14 +225,14 @@ public class ObservationDbCheck : CarbonPlugin
         DumpMembers(_connection, "connection");
         _stage = "create";
         var create = $"CREATE TABLE IF NOT EXISTS {Table} (id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT NOT NULL, created_utc TEXT NOT NULL, value INTEGER NOT NULL)";
-        ExecuteSql("create", create, new object[0], result => Insert());
+        ExecuteSql("create", create, new object[0], result => InsertStep());
     }
 
     private void InsertStep()
     {
         _stage = "insert";
         var sql = $"INSERT INTO {Table} (token, created_utc, value) VALUES (@0, @1, @2)";
-        ExecuteSql("insert", sql, new object[] { _token, DateTime.UtcNow.ToString("O"), 42 }, result => Select());
+        ExecuteSql("insert", sql, new object[] { _token, DateTime.UtcNow.ToString("O"), 42 }, result => SelectStep());
     }
 
     private void SelectStep()

@@ -24,6 +24,7 @@ Then read every `WARN` line and decide whether it needs a change. Only after tha
 | CE-3 | Version shown in the banner does not match the file | v0.11.8 banner while the file said v0.11.13 | A stale copy of the file was loaded, or the header and `Info` were not updated together. | Version written in three places, checked by the script. Confirm the banner after each reload. | §1 version consistency; self-test "version drift" |
 | CE-4 | `CuiHelper` and CUI types not found | v0.6.1 (recorded in the brief change log) | `using Oxide.Game.Rust.Cui;` missing. | Add the using. | §5 Oxide CUI names; self-test "missing Oxide CUI using" |
 | CE-5 | Probe present in the switch but not in the list, or the reverse | Caught in review before any build | Two places to update for each new probe. | Update both `case` and `KnownIds` together. | §6 dispatch vs KnownIds; self-test "probe missing from KnownIds" |
+| CE-5 | CS0103: `The name 'Insert' does not exist in the current context` (ObservationDbCheck.cs line 228; `Select()` on line 235 was the same fault) | v0.1.0 of ObservationDbCheck.cs | A method was renamed (`Insert` to `InsertStep`, `Select` to `SelectStep`) and one call site was missed. The earlier rename only matched calls ending in `;`, so a call inside a lambda (`result => Insert()`) was missed. | Rename every call site, including calls inside lambdas and calls with no semicolon after them. | §13 undefined calls (every `probes/*.cs` file); self-test "undefined call" |
 
 ## Preventive rules (no operator report yet)
 
@@ -33,6 +34,7 @@ Then read every `WARN` line and decide whether it needs a change. Only after tha
 - **Ambiguous `Random` and `Object`** when both `System` and `UnityEngine` are imported: rule §4.
 - **Missing namespaces** for LINQ, `StringBuilder`, `List<>`, `System.IO`: rule §5.
 - **Named arguments to Carbon or Harmony calls:** only verified names pass without a warning. Anything new gets a warning until it is confirmed (rule §8).
+- **Undefined calls (CS0103):** an unqualified call to a method that no longer exists, usually after a rename. Rule §13 checks every `probes/*.cs` file. Lambda and no-semicolon call sites are included. Inherited names (`GetType`, `ReferenceEquals`) and attributes (`HarmonyPatch`) are allowlisted.
 - **Blocking calls** (`Thread.Sleep`, `.Result`, `.Wait()`) on the server thread: warning, rule §12.
 
 ## Adding an entry
