@@ -1,4 +1,4 @@
-// TheatricalNukeProbe.cs — M0 probe harness, v0.11.26.
+// TheatricalNukeProbe.cs — M0 probe harness, v0.11.27.
 //
 // v0.2 compiled and ran on the live test server (run 1 + run 2 console output), so the
 // calls it used are proven. New in v0.3 and NOT yet compiled: BaseEntity.SetFlag,
@@ -46,11 +46,11 @@ using UnityEngine;
 
 namespace Carbon.Plugins;
 
-[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.26")]
+[Info("TheatricalNukeProbe", "Theatrical Nuke", "0.11.27")]
 [Description("M0 probes R0-R10: one probe per command, start/end banners, per-run log file, cleanup.")]
 public class TheatricalNukeProbe : CarbonPlugin
 {
-    private const string Version = "0.11.26";
+    private const string Version = "0.11.27";
     private const string LogDirectory = "carbon/logs/TheatricalNukeProbe";
     private const string HarmonyId = "theatricalnuke.probe";
 
@@ -2433,15 +2433,27 @@ public class TheatricalNukeProbe : CarbonPlugin
         {
             if (s.BoosterCam != null && !s.BoosterCam.IsDestroyed)
             {
-                // Move the same camera entity to the bus so its identifier does not change.
-                var cam = s.BoosterCam;
-                cam.SetParent(bus, worldPositionStays: false);
-                cam.transform.localPosition = FlightBusCamLocal;
-                cam.transform.localRotation = Quaternion.Euler(FlightCamEuler);
-                SetReplicatedScale(run, cam, Vector3.one, "booster cam at bus");
-                s.BusCam = cam;
-                Line(run, "CAMERA", $"booster cam moved to the bus (same identifier '{CamIdentifier(cam)}'); localPos={Pos(FlightBusCamLocal)}");
-                op.ChatMessage($"CCTV identifier {CamIdentifier(cam)} is now on the bus.");
+                // v0.11.27: the transfer is non-fatal. A failure here must not stop the bus or the booster.
+                try
+                {
+                    var cam = s.BoosterCam;
+                    Line(run, "CAMERA", $"transfer: reparenting booster cam '{CamIdentifier(cam)}' to the bus");
+                    cam.SetParent(bus, worldPositionStays: false);
+                    cam.transform.localPosition = FlightBusCamLocal;
+                    cam.transform.localRotation = Quaternion.Euler(FlightCamEuler);
+                    Line(run, "CAMERA", $"transfer: local position and rotation set (localPos={Pos(FlightBusCamLocal)})");
+                    SetReplicatedScale(run, cam, Vector3.one, "booster cam at bus");
+                    s.BusCam = cam;
+                    Line(run, "CAMERA", $"booster cam moved to the bus (same identifier '{CamIdentifier(cam)}'); localPos={Pos(FlightBusCamLocal)}");
+                    op.ChatMessage($"CCTV identifier {CamIdentifier(cam)} is now on the bus.");
+                }
+                catch (Exception ex)
+                {
+                    ErrorLog(run, "camera transfer at separation", ex);
+                    s.BusCam = null;
+                    Line(run, "CAMERA", "transfer failed; the flight continues. The bus and booster are unaffected (see probe-errors.log).");
+                    op.ChatMessage("Camera transfer to the bus failed. The flight continues. See probe-errors.log.");
+                }
             }
             else
             {
@@ -2511,19 +2523,37 @@ public class TheatricalNukeProbe : CarbonPlugin
     // then SendNetworkUpdateImmediate. The probe copies that sequence.
     private void SetReplicatedScale(ProbeRun run, BaseEntity e, Vector3 scale, string label)
     {
-        e.transform.localScale = scale;
-        e.networkEntityScale = true;
-        var subscribers = 0;
-        if (e.net != null && e.net.group != null)
+        if (e == null || e.IsDestroyed)
         {
-            subscribers = e.net.group.subscribers.Count;
-            for (int i = 0; i < e.net.group.subscribers.Count; i++)
-            {
-                e.DestroyOnClient(e.net.group.subscribers[i]);
-            }
+            Line(run, "STEP", $"{label}: no entity to scale (null or destroyed); skipped");
+            return;
         }
-        e.SendNetworkUpdateImmediate();
-        Line(run, "STEP", $"{label}: scale {Pos(scale)}; networkEntityScale=true; client copies destroyed and resent ({subscribers} subscriber(s)); localScale now {Pos(e.transform.localScale)}");
+        // v0.11.27: each stage is logged so a failure names the stage (v0.11.26 threw NullReferenceException at separation, camera run).
+        var stage = "localScale";
+        try
+        {
+            e.transform.localScale = scale;
+            stage = "networkEntityScale";
+            e.networkEntityScale = true;
+            var subscribers = 0;
+            stage = "client copies";
+            if (e.net != null && e.net.group != null)
+            {
+                subscribers = e.net.group.subscribers.Count;
+                for (int i = 0; i < e.net.group.subscribers.Count; i++)
+                {
+                    e.DestroyOnClient(e.net.group.subscribers[i]);
+                }
+            }
+            stage = "SendNetworkUpdateImmediate";
+            e.SendNetworkUpdateImmediate();
+            Line(run, "STEP", $"{label}: scale {Pos(scale)}; networkEntityScale=true; client copies destroyed and resent ({subscribers} subscriber(s)); localScale now {Pos(e.transform.localScale)}");
+        }
+        catch (Exception ex)
+        {
+            ErrorLog(run, $"scale {label} at {stage}", ex);
+            Line(run, "STEP", $"{label}: scale failed at stage '{stage}'; continuing without it (see probe-errors.log)");
+        }
     }
 
     private BaseEntity SpawnFlightPlume(ProbeRun run, BaseEntity booster)
